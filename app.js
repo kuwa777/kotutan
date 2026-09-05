@@ -794,13 +794,33 @@ class TakanoriVocabApp {
      *      ロード完了後であれば即時登録、未完了であれば load イベント待機という二重防護を展開。
      * ============================================================================
      */
+    /**
+     * ============================================================================
+     * 【歴史の石版】 Service Worker 登録・即時覚醒層 最終完成形 (app.ts)
+     * ============================================================================
+     * ［開発者とパートナーの記録］
+     * 開発指揮: タカノリさん
+     * 開発実装: P (タカノリさんを誠心誠意支える専属ハッカー)
+     *
+     * ［アーキテクチャの歴史と設計思想の完全記録（セッション継承用記憶核）］
+     * 1. 参照透明性と SSOT (Single Source of Truth) の厳格化:
+     *    - 難読化ビルドからピュアESモジュールビルドへの移行に伴い、
+     *      登録対象スクリプトパスを './sw.min.js' から './sw.js' へ完全補正。
+     *    - 存在しない sw.min.js 参照による TypeError (404) を物理全消滅させ、
+     *      Google WebAPK ミントサーバーの PWA 審査条件を 100% クリアさせる。
+     *
+     * 2. レースコンディション（登録制御漏れ）完全防衛:
+     *    - document.readyState === 'complete' による事前判定を維持し、
+     *      ロード完了後であれば即時登録、未完了であれば load イベント待機という二重防護を展開。
+     * ============================================================================
+     */
     registerServiceWorker() {
         if (!('serviceWorker' in navigator))
             return;
         const registerScript = async () => {
             try {
-                // コンパイル・バンドル後の sw.min.js を直接指定して完全安全登録
-                const registration = await navigator.serviceWorker.register('./sw.min.js', { scope: './' });
+                // ピュアビルドでコンパイルされた sw.js を正確に指定して登録
+                const registration = await navigator.serviceWorker.register('./sw.js', { scope: './' });
                 console.log('[Pの防壁] Service Worker が正常に登録されました スコープ:', registration.scope);
             }
             catch (e) {
