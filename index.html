@@ -2,46 +2,24 @@
 <html lang="ja">
 <head>
   <!-- ============================================================================== -->
-  <!-- 【歴史の石版】 WebAPK完全覚醒 ✕ プレーンESモジュール動作基盤 (index.html)        -->
+  <!-- 【歴史の石版】 WebAPK完全覚醒 ✕ エラーゼロピュアPWA基盤 (index.html)             -->
   <!-- ============================================================================== -->
   <!-- ［開発者とパートナーの記録］                                                  -->
   <!-- 開発指揮: タカノリさん                                                        -->
   <!-- 開発実装: P (タカノリさんを誠心誠意支える専属ハッカー)                        -->
   <!--                                                                              -->
   <!-- ［アーキテクチャの歴史と設計思想の完全記録（セッション継承用記憶核）］        -->
-  <!-- 1. ピュアESモジュール直連動アーキテクチャ:                                   -->
-  <!--    - 難読化・結合処理を行わない開発/検証フェーズに対応するため、             -->
-  <!--      末尾のスクリプト読み込みを <script type="module" src="app.js"> へ完全調整。-->
-  <!--    - ブラウザ標準のESM依存関係解決を有効化し、構文エラーを物理消滅。         -->
-  <!--                                                                              -->
-  <!-- 2. 完全閉鎖型 CSP 防護壁 ✕ PWA メタデータ標準化:                              -->
-  <!--    - default-src 'self' の強固なセキュリティを維持。                          -->
-  <!--    - Chrome ミントサーバーがインストーラビリティ（WebAPK）を100%承認する      -->
-  <!--      マニフェスト参照およびメタタグ階層を保持。                              -->
+  <!-- 1. WebAPKビルド不全の根本撃滅（Eruda一時撤廃）:                              -->
+  <!--    - Googleミントサーバーの審査を100%通過させるため、                        -->
+  <!--      コンソールエラーやDOM介入の要因となる Eruda を完全に除外。              -->
+  <!--    - ページ初期化時のエラーを物理的にゼロにし、完全独立アプリ化を強制誘導。    -->
   <!-- ============================================================================== -->
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; worker-src 'self'; manifest-src 'self'; media-src 'self' blob: data:;">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; worker-src 'self'; manifest-src 'self'; media-src 'self' blob: data:;">
   
   <title>コツ単</title>
-
-  <script src="eruda.min.js"></script>
-  <script>
-    (function() {
-      function initEruda() {
-        if (window.eruda) {
-          window.eruda.init();
-          console.log('[Pの防壁] ローカル Eruda デベロッパーツールが安全に起動いたしました！');
-        }
-      }
-      if (document.readyState === 'complete' || document.readyState === 'interactive') {
-        initEruda();
-      } else {
-        window.addEventListener('DOMContentLoaded', initEruda);
-      }
-    })();
-  </script>
 
   <!-- PWA ネイティブ表示 ＆ メタデータ定義 -->
   <meta name="theme-color" content="#FAF5F0" id="theme-color-meta">
