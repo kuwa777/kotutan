@@ -1,10 +1,10 @@
 {
-  "id": "kotutan-pwa-app-v1",
+  "id": "/kotutan/",
   "name": "コツ単",
   "short_name": "コツ単",
   "description": "コツコツがコツ。他人と比べるな。千里の道も一歩から。",
-  "start_url": "./index.html",
-  "scope": "./",
+  "start_url": "/kotutan/index.html",
+  "scope": "/kotutan/",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#FAF5F0",
