@@ -11,22 +11,29 @@
  * 開発実装: P (タカノリさんを誠心誠意支える専属ハッカー)
  *
  * ［アーキテクチャの歴史と設計思想の完全記録（セッション継承用記憶核）］
- * 1. .webmanifest 移行 ✕ キャッシュバージョン v1.0.6 昇格:
- *    - タカノリさんから共有いただいた最新コードを精査。
- *    - 古い index.html キャッシュを強制破棄させるため、バージョンを 1.0.6 へ昇格。
+ * 1. .webmanifest ネットワーク直通バイパス（Service Worker非干渉化）:
+ *    - タカノリさんの指揮の下、manifest.webmanifest へのリクエストを Service Worker で
+ *      フックせず、ネットワーク（GitHub Pages）への完全直通（return;）構造へ昇格。
+ *    - url.pathname.endsWith('manifest.webmanifest') により、クエリ(?v=...)が付与されていても
+ *      100%確実に検知し、Service Worker の合成レスポンスをバイパスさせる。
+ *    - Android 14 Chrome (Blink) および Google ミントサーバーが受領する
+ *      Content-Type: application/manifest+json 生ヘッダーの完全性を100%保証し、
+ *      WebAPK 化（アドレスバー消滅）の自動生成審査を確実に突破させる。
  *
- * 2. HTML ＆ マニフェスト Network-First（オンライン最新同期 ✕ オフライン0秒起動）:
- *    - ナビゲーション（index.html）および manifest.webmanifest に対しては
- *      オンライン時に常に最新版を取得・同期する Network-First 戦略を採用。
- *    - オフライン時は即座に Cache API へフォールバックし、完全ローカル閉鎖起動を維持。
+ * 2. 自動バージョン注入（1.0.20260906-233456 プレースホルダー構造）:
+ *    - build-deploy.js 実行時にタイムスタンプ（例: 1.0.YYYYMMDD-HHmmss）が自動挿入され、
+ *      バージョン書き換え忘れによるキャッシュ残存事故を物理全消滅。
  *
  * 3. 音声 Range 要求（206 Partial Content）安全バイパス回路:
  *    - <audio> 要素が発行する Range 要求を検知し、Cache API の保存エラーを回避。
+ *
+ * 4. ナビゲーション（index.html）Network-First ＆ アセット Cache-First:
+ *    - index.html はオンライン時最新同期、その他アセットはキャッシュ優先で0秒起動。
  * ============================================================================
  */
-// キャッシュ定数（自己完結フォールバック定義）
+// キャッシュ定数（build-deploy.js により 1.0.20260906-233456 が自動置換されます）
 const CACHE_PREFIX = 'takanori-vocab-v';
-const CURRENT_CACHE_VERSION = '1.0.20260906-231505';
+const CURRENT_CACHE_VERSION = '1.0.20260906-233456';
 const ACTIVE_CACHE_NAME = `${CACHE_PREFIX}${CURRENT_CACHE_VERSION}`;
 // 型安全性の確保（グローバル再宣言エラーを100%回避するキャスト）
 const swSelf = self;
@@ -102,14 +109,18 @@ swSelf.addEventListener('fetch', (event) => {
     if (request.method !== 'GET' || !url.protocol.startsWith('http')) {
         return;
     }
-    // スマホの音声再生で発生する Range 要求は Cache API で保存不可能なため直接ネットワークへ通過
+    // 1. スマホの音声再生で発生する Range 要求は Cache API で保存不可能なため直接ネットワークへ通過
     if (request.headers.has('range')) {
         return;
     }
-    // ナビゲーション（index.html）および マニフェスト要求は Network-First（オンライン時は常に最新取得、失敗時にキャッシュ）
+    // 2.【絶対防御】マニフェスト要求（.webmanifest）は Service Worker で一切フックせず、完全ネットワーク直通（バイパス）
+    // Android 14 Chrome (Blink) および Google ミントサーバーへ GitHub Pages の生のレスポンスを直接渡す
+    if (url.pathname.endsWith('manifest.webmanifest')) {
+        return;
+    }
+    // 3. ナビゲーション（index.html）要求は Network-First（オンライン時は最新取得、失敗時にキャッシュ）
     const isNavigation = request.mode === 'navigate';
-    const isManifest = url.pathname.endsWith('manifest.webmanifest');
-    if (isNavigation || isManifest) {
+    if (isNavigation) {
         event.respondWith((async () => {
             try {
                 const networkResponse = await fetch(request);
@@ -126,18 +137,16 @@ swSelf.addEventListener('fetch', (event) => {
             if (cachedResponse) {
                 return cachedResponse;
             }
-            if (isNavigation) {
-                const cache = await caches.open(ACTIVE_CACHE_NAME);
-                const fallback = await cache.match('./index.html') || await cache.match('./');
-                if (fallback) {
-                    return fallback;
-                }
+            const cache = await caches.open(ACTIVE_CACHE_NAME);
+            const fallback = await cache.match('./index.html') || await cache.match('./');
+            if (fallback) {
+                return fallback;
             }
             return new Response('', { status: 408 });
         })());
         return;
     }
-    // その他のアセット（CSS, JS, アイコン等）は Cache-First（キャッシュ優先で0秒起動）
+    // 4. その他のアセット（CSS, JS, アイコン等）は Cache-First（キャッシュ優先で0秒起動）
     event.respondWith((async () => {
         try {
             const cachedResponse = await caches.match(request);
