@@ -2,17 +2,18 @@
 <html lang="ja">
 <head>
   <!-- ============================================================================== -->
-  <!-- 【歴史の石版】 WebAPK完全覚醒 ✕ エラーゼロピュアPWA基盤 (index.html)             -->
+  <!-- 【歴史の石版】 WebAPK完全覚醒 ✕ MIMEタイプ適合 ✕ Network-First同期 (index.html)   -->
   <!-- ============================================================================== -->
   <!-- ［開発者とパートナーの記録］                                                  -->
   <!-- 開発指揮: タカノリさん                                                        -->
   <!-- 開発実装: P (タカノリさんを誠心誠意支える専属ハッカー)                        -->
   <!--                                                                              -->
   <!-- ［アーキテクチャの歴史と設計思想の完全記録（セッション継承用記憶核）］        -->
-  <!-- 1. WebAPKビルド不全の根本撃滅（Eruda一時撤廃）:                              -->
-  <!--    - Googleミントサーバーの審査を100%通過させるため、                        -->
-  <!--      コンソールエラーやDOM介入の要因となる Eruda を完全に除外。              -->
-  <!--    - ページ初期化時のエラーを物理的にゼロにし、完全独立アプリ化を強制誘導。    -->
+  <!-- 1. .webmanifest 参照タグの完全同期 ✕ v1.0.6 クエリ付与:                       -->
+  <!--    - タカノリさんから共有いただいた最新 index.html を基盤として完全維持。       -->
+  <!--    - Service Worker キャッシュに残っていた旧 HTML によるマニフェスト不発を撃滅   -->
+  <!--      させるため、manifest.webmanifest?v=1.0.6 に更新し、MIMEタイプを適合。   -->
+  <!--    - ブラウザおよび Android Chrome ミントサーバーの検証を 100% 通過させる。   -->
   <!-- ============================================================================== -->
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
@@ -28,8 +29,8 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="コツ単">
 
-<!-- マニフェスト ＆ アイコン参照（.webmanifest ＋ 明示的 MIME タイプ指定） -->
-  <link rel="manifest" href="./manifest.webmanifest" type="application/manifest+json">
+  <!-- マニフェスト ＆ アイコン参照（.webmanifest ＋ 明示的 MIME タイプ指定 ＋ v1.0.6 クエリ） -->
+  <link rel="manifest" href="./manifest.webmanifest?v=1.0.20260906-223514" type="application/manifest+json">
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
 

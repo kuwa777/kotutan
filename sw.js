@@ -11,20 +11,22 @@
  * 開発実装: P (タカノリさんを誠心誠意支える専属ハッカー)
  *
  * ［アーキテクチャの歴史と設計思想の完全記録（セッション継承用記憶核）］
- * 1. .webmanifest 移行に伴うキャッシュ整合性の完全確保:
- *    - タカノリさんの発見に基づき、GitHub Pages の application/manifest+json 配信仕様
- *      に適合させるため、事前キャッシュリストの参照先を ./manifest.webmanifest へ完全変更。
- *    - キャッシュバージョンを v1.0.5 に更新し、旧キャッシュをパージ。
- *    - オフラインキャッシュ時の 404 例外を防止し、WebAPK 審査を確定で通過させる。
+ * 1. .webmanifest 移行 ✕ キャッシュバージョン v1.0.6 昇格:
+ *    - タカノリさんから共有いただいた最新コードを精査。
+ *    - 古い index.html キャッシュを強制破棄させるため、バージョンを 1.0.6 へ昇格。
  *
- * 2. 音声 Range 要求（206 Partial Content）安全バイパス回路:
- *    - スマホ端末の <audio> 要素が発行する Range 要求を検知し、Cache API の保存エラーを回避。
- *    - 破綻なき通信例外保護 ＆ 0秒起動パイプラインを強固に防衛。
+ * 2. HTML ＆ マニフェスト Network-First（オンライン最新同期 ✕ オフライン0秒起動）:
+ *    - ナビゲーション（index.html）および manifest.webmanifest に対しては
+ *      オンライン時に常に最新版を取得・同期する Network-First 戦略を採用。
+ *    - オフライン時は即座に Cache API へフォールバックし、完全ローカル閉鎖起動を維持。
+ *
+ * 3. 音声 Range 要求（206 Partial Content）安全バイパス回路:
+ *    - <audio> 要素が発行する Range 要求を検知し、Cache API の保存エラーを回避。
  * ============================================================================
  */
 // キャッシュ定数（自己完結フォールバック定義）
 const CACHE_PREFIX = 'takanori-vocab-v';
-const CURRENT_CACHE_VERSION = '1.0.5';
+const CURRENT_CACHE_VERSION = '1.0.20260906-223514';
 const ACTIVE_CACHE_NAME = `${CACHE_PREFIX}${CURRENT_CACHE_VERSION}`;
 // 型安全性の確保（グローバル再宣言エラーを100%回避するキャスト）
 const swSelf = self;
@@ -104,6 +106,38 @@ swSelf.addEventListener('fetch', (event) => {
     if (request.headers.has('range')) {
         return;
     }
+    // ナビゲーション（index.html）および マニフェスト要求は Network-First（オンライン時は常に最新取得、失敗時にキャッシュ）
+    const isNavigation = request.mode === 'navigate';
+    const isManifest = url.pathname.endsWith('manifest.webmanifest');
+    if (isNavigation || isManifest) {
+        event.respondWith((async () => {
+            try {
+                const networkResponse = await fetch(request);
+                if (networkResponse && networkResponse.status === 200) {
+                    const cache = await caches.open(ACTIVE_CACHE_NAME);
+                    cache.put(request, networkResponse.clone());
+                    return networkResponse;
+                }
+            }
+            catch (e) {
+                console.warn('[ServiceWorker] ネットワーク取得失敗。キャッシュから起動します:', request.url);
+            }
+            const cachedResponse = await caches.match(request);
+            if (cachedResponse) {
+                return cachedResponse;
+            }
+            if (isNavigation) {
+                const cache = await caches.open(ACTIVE_CACHE_NAME);
+                const fallback = await cache.match('./index.html') || await cache.match('./');
+                if (fallback) {
+                    return fallback;
+                }
+            }
+            return new Response('', { status: 408 });
+        })());
+        return;
+    }
+    // その他のアセット（CSS, JS, アイコン等）は Cache-First（キャッシュ優先で0秒起動）
     event.respondWith((async () => {
         try {
             const cachedResponse = await caches.match(request);
@@ -121,14 +155,6 @@ swSelf.addEventListener('fetch', (event) => {
         }
         catch (error) {
             console.error('[ServiceWorker] ネットワーク取得失敗:', request.url);
-            if (request.mode === 'navigate') {
-                const cache = await caches.open(ACTIVE_CACHE_NAME);
-                const fallback = await cache.match('./index.html') || await cache.match('./');
-                if (fallback) {
-                    return fallback;
-                }
-                return new Response('<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>コツ単</title></head><body><script>location.reload();</script></body></html>', { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
-            }
             return new Response('', { status: 408 });
         }
     })());
