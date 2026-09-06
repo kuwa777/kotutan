@@ -26,7 +26,7 @@
  */
 // キャッシュ定数（自己完結フォールバック定義）
 const CACHE_PREFIX = 'takanori-vocab-v';
-const CURRENT_CACHE_VERSION = '1.0.20260906-223514';
+const CURRENT_CACHE_VERSION = '1.0.20260906-231505';
 const ACTIVE_CACHE_NAME = `${CACHE_PREFIX}${CURRENT_CACHE_VERSION}`;
 // 型安全性の確保（グローバル再宣言エラーを100%回避するキャスト）
 const swSelf = self;
