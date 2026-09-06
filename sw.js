@@ -11,10 +11,11 @@
  * 開発実装: P (タカノリさんを誠心誠意支える専属ハッカー)
  *
  * ［アーキテクチャの歴史と設計思想の完全記録（セッション継承用記憶核）］
- * 1. ピュアESモジュール個別事前キャッシュ ✕ WebAPK適合:
- *    - 難読化を行わない完全プレーン環境へ適合させるため、キャッシュ対象に
- *      ./app.js, ./constants.js, ./types.js, ./db.js, ./csvParser.js を直接明示。
- *    - Google WebAPK ミントサーバーのオフライン検証テストを 100% クリアさせ、独立アプリ化を強制誘発。
+ * 1. .webmanifest 移行に伴うキャッシュ整合性の完全確保:
+ *    - タカノリさんの発見に基づき、GitHub Pages の application/manifest+json 配信仕様
+ *      に適合させるため、事前キャッシュリストの参照先を ./manifest.webmanifest へ完全変更。
+ *    - キャッシュバージョンを v1.0.5 に更新し、旧キャッシュをパージ。
+ *    - オフラインキャッシュ時の 404 例外を防止し、WebAPK 審査を確定で通過させる。
  *
  * 2. 音声 Range 要求（206 Partial Content）安全バイパス回路:
  *    - スマホ端末の <audio> 要素が発行する Range 要求を検知し、Cache API の保存エラーを回避。
@@ -23,11 +24,11 @@
  */
 // キャッシュ定数（自己完結フォールバック定義）
 const CACHE_PREFIX = 'takanori-vocab-v';
-const CURRENT_CACHE_VERSION = '1.0.4';
+const CURRENT_CACHE_VERSION = '1.0.5';
 const ACTIVE_CACHE_NAME = `${CACHE_PREFIX}${CURRENT_CACHE_VERSION}`;
 // 型安全性の確保（グローバル再宣言エラーを100%回避するキャスト）
 const swSelf = self;
-// ピュアJS構成に対応した全コアアセットの完全事前キャッシュリスト
+// ピュアJS構成 ＆ .webmanifest に対応した全コアアセットの完全事前キャッシュリスト
 const INITIAL_CACHED_RESOURCES = [
     './',
     './index.html',
@@ -38,10 +39,9 @@ const INITIAL_CACHED_RESOURCES = [
     './db.js',
     './csvParser.js',
     './sw.js',
-    './manifest.json',
+    './manifest.webmanifest',
     './words_master.json',
     './version.json',
-    './eruda.min.js',
     './icons/icon-192.png',
     './icons/icon-512.png'
 ];
