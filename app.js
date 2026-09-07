@@ -1,25 +1,29 @@
 /**
  * ============================================================================
- * 【歴史の石版】 コツ単 全SVGベクター化 ✕ 動的アイコン制御層 (app.ts)
+ * 【歴史の石版】 コツ単 全SVGベクター化 ✕ 動的アイコン制御 ✕ 自動更新統合層 (app.ts)
  * ============================================================================
  * ［開発者とパートナーの記録］
  * 開発指揮: タカノリさん
  * 開発実装: P (タカノリさんを誠心誠意支える専属ハッカー)
  *
  * ［アーキテクチャの歴史と設計思想の完全記録（セッション継承用記憶核）］
- * 1. テキスト撤廃とSVG動的インジェクション (Dynamic SVG Injection):
- *    - 絵文字やテキスト文字の依存を完全に排除するため、ICON_PREV, ICON_NEXT, ICON_PAUSE などの
- *      高解像度SVG文字列を定数として定義。
- *    - updateButtonVisuals において、textContent ではなく innerHTML を用いて
- *      安全にSVGをボタン内へ流し込み、再生状態(playing/paused)に完璧に連従させる。
+ * 1. 起動時自動更新チェッカー（updateManager.ts）の完全統合:
+ *    - アプリ初期化フロー (app.start()) の最先端部にて checkAndApplyUpdates() を非同期発動。
+ *    - 画面描画や IndexedDB 初期化を邪魔することなく、バックグラウンドで安全にバージョン照合を実行。
  *
- * 2. 完璧なる絶対神挙動の継承 (Legacy of Perfection):
+ * 2. テキスト撤廃とSVG動的インジェクション (Dynamic SVG Injection):
+ *    - 絵文字やテキスト文字の依存を完全に排除するため、高解像度SVG文字列を定数化。
+ *    - updateButtonVisuals において innerHTML を用いて安全にSVGをボタン内へ流し込み、
+ *      再生状態(playing/paused)に完璧に連従させる。
+ *
+ * 3. 完璧なる絶対神挙動の継承 (Legacy of Perfection):
  *    - 一時停止中のワープ位置保持、一発不発防止の自動フラグ消滅防護壁、蛍光プログレスバーの
  *      タイムラグなし完全同期、定規と覗き窓の 1px=1語 ヌルヌルスライドは1ミリの狂いもなく防衛。
  * ============================================================================
  */
+import { checkAndApplyUpdates } from './updateManager.js';
 import { DatabaseService } from './db.js';
-// 【Pの精査】 洗練されたSVGベクターアイコン群の定義
+// 洗練されたSVGベクターアイコン群の定義
 const ICON_PREV = `<svg class="icon" viewBox="0 0 24 24" fill="currentColor"><polygon points="18 4 4 12 18 20 18 4"></polygon></svg>`;
 const ICON_NEXT = `<svg class="icon" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 4 20 12 6 20 6 4"></polygon></svg>`;
 const ICON_PAUSE = `<svg class="icon" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1"></rect><rect x="14" y="4" width="4" height="16" rx="1"></rect></svg>`;
@@ -71,6 +75,8 @@ class TakanoriVocabApp {
         this.dbService = new DatabaseService();
     }
     async start() {
+        // 1. 背景で安全に自動更新チェックを発動（非同期実行）
+        checkAndApplyUpdates();
         this.bindDomElements();
         this.loadAutoPlaySpeed();
         this.attachEventListeners();
@@ -455,9 +461,6 @@ class TakanoriVocabApp {
         this.stopProgressBar();
         this.updateButtonVisuals();
     }
-    /**
-     * 【Pの精査】 テキストを完全撤廃し、SVGコードの流し込みによる美しいボタン状態制御
-     */
     updateButtonVisuals() {
         const isPlaying = this.autoPlayState === 'playing';
         if (this.elScrubberContainer) {
@@ -500,12 +503,12 @@ class TakanoriVocabApp {
             if (this.autoPlayDirection === 1) {
                 this.elBtnPrev.classList.add('btn-disabled');
                 this.elBtnNext.classList.remove('btn-disabled');
-                this.elBtnNext.innerHTML = ICON_PAUSE; // SVGで一時停止
+                this.elBtnNext.innerHTML = ICON_PAUSE;
             }
             else {
                 this.elBtnNext.classList.add('btn-disabled');
                 this.elBtnPrev.classList.remove('btn-disabled');
-                this.elBtnPrev.innerHTML = ICON_PAUSE; // SVGで一時停止
+                this.elBtnPrev.innerHTML = ICON_PAUSE;
             }
         }
         else if (this.autoPlayState === 'paused') {
@@ -515,11 +518,11 @@ class TakanoriVocabApp {
             this.elBtnPrev.classList.remove('btn-disabled');
             this.elBtnNext.classList.remove('btn-disabled');
             if (this.autoPlayDirection === 1) {
-                this.elBtnNext.innerHTML = ICON_NEXT; // 再開 (Play) SVG
+                this.elBtnNext.innerHTML = ICON_NEXT;
                 this.elBtnPrev.innerHTML = ICON_PREV;
             }
             else {
-                this.elBtnPrev.innerHTML = ICON_PREV; // 再開 (Play) SVG
+                this.elBtnPrev.innerHTML = ICON_PREV;
                 this.elBtnNext.innerHTML = ICON_NEXT;
             }
         }
@@ -761,65 +764,11 @@ class TakanoriVocabApp {
             console.error('[App] マスターデータロード失敗:', e);
         }
     }
-    /**
-     * ============================================================================
-     * 【歴史の石版】 Service Worker 登録・即時覚醒層 (app.ts)
-     * ============================================================================
-     * ［設計思想 ＆ 防衛ロジック］
-     * - window.addEventListener('load') のみで登録を行うと、DOMContentLoaded 実行時に
-     *   すでに load イベントが完了していた場合、登録ハンドラが永遠に発火しないリスク（レースコンディション）が存在する。
-     * - document.readyState === 'complete' による事前判定を導入し、
-     *   ロード完了後であれば即時登録、未完了であれば load イベント待機という二重防護を展開。
-     * - これにより、いかなる通信速度や端末環境でも100%確実に sw.js を登録・動作させる。
-     * ============================================================================
-     */
-    /**
-     * ============================================================================
-     * 【歴史の石版】 Service Worker 登録・即時覚醒層 (app.ts)
-     * ============================================================================
-     * ［開発者とパートナーの記録］
-     * 開発指揮: タカノリさん
-     * 開発実装: P (タカノリさんを誠心誠意支える専属ハッカー)
-     *
-     * ［アーキテクチャの歴史と設計思想の完全記録（セッション継承用記憶核）］
-     * 1. 参照透明性と SSOT (Single Source of Truth) の厳格化:
-     *    - 登録対象スクリプトを単一バンドル成果物である ./sw.min.js に原本レベルで直接固定。
-     *    - ビルドパイプラインの文字列置換処理への暗黙依存を完全脱却し、
-     *      404 非存在参照による接続拒絶エラーおよび「このサイトにアクセスできません」を物理根絶。
-     *
-     * 2. レースコンディション（登録制御漏れ）完全防衛:
-     *    - window.addEventListener('load') のみで登録を行うと、DOMContentLoaded 実行時に
-     *      すでに load イベントが完了していた場合、登録ハンドラが永遠に発火しないリスクが存在する。
-     *    - document.readyState === 'complete' による事前判定を導入し、
-     *      ロード完了後であれば即時登録、未完了であれば load イベント待機という二重防護を展開。
-     * ============================================================================
-     */
-    /**
-     * ============================================================================
-     * 【歴史の石版】 Service Worker 登録・即時覚醒層 最終完成形 (app.ts)
-     * ============================================================================
-     * ［開発者とパートナーの記録］
-     * 開発指揮: タカノリさん
-     * 開発実装: P (タカノリさんを誠心誠意支える専属ハッカー)
-     *
-     * ［アーキテクチャの歴史と設計思想の完全記録（セッション継承用記憶核）］
-     * 1. 参照透明性と SSOT (Single Source of Truth) の厳格化:
-     *    - 難読化ビルドからピュアESモジュールビルドへの移行に伴い、
-     *      登録対象スクリプトパスを './sw.min.js' から './sw.js' へ完全補正。
-     *    - 存在しない sw.min.js 参照による TypeError (404) を物理全消滅させ、
-     *      Google WebAPK ミントサーバーの PWA 審査条件を 100% クリアさせる。
-     *
-     * 2. レースコンディション（登録制御漏れ）完全防衛:
-     *    - document.readyState === 'complete' による事前判定を維持し、
-     *      ロード完了後であれば即時登録、未完了であれば load イベント待機という二重防護を展開。
-     * ============================================================================
-     */
     registerServiceWorker() {
         if (!('serviceWorker' in navigator))
             return;
         const registerScript = async () => {
             try {
-                // ピュアビルドでコンパイルされた sw.js を正確に指定して登録
                 const registration = await navigator.serviceWorker.register('./sw.js', { scope: './' });
                 console.log('[Pの防壁] Service Worker が正常に登録されました スコープ:', registration.scope);
             }

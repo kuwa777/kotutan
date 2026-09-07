@@ -20,24 +20,25 @@
  *      Content-Type: application/manifest+json 生ヘッダーの完全性を100%保証し、
  *      WebAPK 化（アドレスバー消滅）の自動生成審査を確実に突破させる。
  *
- * 2. 自動バージョン注入（1.0.20260906-233456 プレースホルダー構造）:
+ * 2. 自動バージョン注入（1.0.20260908-001239 プレースホルダー構造）:
  *    - build-deploy.js 実行時にタイムスタンプ（例: 1.0.YYYYMMDD-HHmmss）が自動挿入され、
  *      バージョン書き換え忘れによるキャッシュ残存事故を物理全消滅。
  *
- * 3. 音声 Range 要求（206 Partial Content）安全バイパス回路:
- *    - <audio> 要素が発行する Range 要求を検知し、Cache API の保存エラーを回避。
+ * 3. updateManager.js の事前キャッシュ同期:
+ *    - アプリ起動時の自動更新モジュール (updateManager.js) を事前キャッシュへ含め、
+ *      完全オフライン起動時でもモジュール欠落エラーを起こさない構造を保護。
  *
- * 4. ナビゲーション（index.html）Network-First ＆ アセット Cache-First:
- *    - index.html はオンライン時最新同期、その他アセットはキャッシュ優先で0秒起動。
+ * 4. 音声 Range 要求（206 Partial Content）安全バイパス回路:
+ *    - <audio> 要素が発行する Range 要求を検知し、Cache API の保存エラーを回避。
  * ============================================================================
  */
-// キャッシュ定数（build-deploy.js により 1.0.20260906-233456 が自動置換されます）
+// キャッシュ定数（build-deploy.js により 1.0.20260908-001239 が自動置換されます）
 const CACHE_PREFIX = 'takanori-vocab-v';
-const CURRENT_CACHE_VERSION = '1.0.20260906-233456';
+const CURRENT_CACHE_VERSION = '1.0.20260908-001239';
 const ACTIVE_CACHE_NAME = `${CACHE_PREFIX}${CURRENT_CACHE_VERSION}`;
 // 型安全性の確保（グローバル再宣言エラーを100%回避するキャスト）
 const swSelf = self;
-// ピュアJS構成 ＆ .webmanifest に対応した全コアアセットの完全事前キャッシュリスト
+// ピュアJS構成 ＆ .webmanifest ＆ updateManager に対応した全コアアセットの完全事前キャッシュリスト
 const INITIAL_CACHED_RESOURCES = [
     './',
     './index.html',
@@ -47,6 +48,7 @@ const INITIAL_CACHED_RESOURCES = [
     './types.js',
     './db.js',
     './csvParser.js',
+    './updateManager.js',
     './sw.js',
     './manifest.webmanifest',
     './words_master.json',
@@ -114,7 +116,6 @@ swSelf.addEventListener('fetch', (event) => {
         return;
     }
     // 2.【絶対防御】マニフェスト要求（.webmanifest）は Service Worker で一切フックせず、完全ネットワーク直通（バイパス）
-    // Android 14 Chrome (Blink) および Google ミントサーバーへ GitHub Pages の生のレスポンスを直接渡す
     if (url.pathname.endsWith('manifest.webmanifest')) {
         return;
     }
