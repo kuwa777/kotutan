@@ -12,7 +12,7 @@
  * ［アーキテクチャの歴史と設計思想の完全記録（セッション継承用記憶核）］
  * 1. TS直接保持バージョン（APP_VERSION）対話比較構造:
  *    - localStorage の不確定要素（空・削除リスク）を完全排除。
- *    - build-deploy.js により 1.0.20260908-021358 プレースホルダーへタイムスタンプが自動注入され、
+ *    - build-deploy.js により 1.0.20260908-022851 プレースホルダーへタイムスタンプが自動注入され、
  *      現在実行中の TS/JS 自身が持っているバージョンと、サーバーの version.json を直接比較。
  *
  * 2. 5重の絶対防壁（Z-Level Defense System）:
@@ -24,7 +24,7 @@
  * ============================================================================
  */
 // ビルド時に build-deploy.js によってタイムスタンプ（例: 1.0.YYYYMMDD-HHmmss）が注入されます
-export const APP_VERSION = '1.0.20260908-021358';
+export const APP_VERSION = '1.0.20260908-022851';
 const TIMEOUT_MS = 2000; // サーバー通信の厳格タイムアウト（2秒）
 const GRACE_PERIOD_MS = 1200; // 更新前トースト表示 ＆ キャッシュ破棄の猶予時間（1.2秒）
 const SESSION_ATTEMPT_KEY = 'kotutan_update_attempted_ver';
@@ -128,7 +128,7 @@ export async function checkAndApplyUpdates() {
             return;
         }
         // 6. 現在のコードバージョン (APP_VERSION) と比較
-        if (APP_VERSION !== '1.0.20260908-021358' && remoteVersion !== APP_VERSION) {
+        if (APP_VERSION !== '1.0.20260908-022851' && remoteVersion !== APP_VERSION) {
             // 防壁: サーキットブレーカー（当セッションで同じバージョンへの更新試行済みなら無限リロード遮断）
             const attemptedVer = sessionStorage.getItem(SESSION_ATTEMPT_KEY);
             if (attemptedVer === remoteVersion) {
