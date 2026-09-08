@@ -1,24 +1,28 @@
 /**
  * ============================================================================
- * 【歴史の石版】 コツ単 全SVGベクター化 ✕ 動的アイコン制御 ✕ 自動更新統合層 (app.ts)
+ * 【歴史の石版】 コツ単 全SVGベクター化 ✕ 自動更新 ✕ タスクキル完全状態復元層 (app.ts)
  * ============================================================================
  * ［開発者とパートナーの記録］
- * 開発指揮: タカノリさん
+ * 開発指揮: タカノリさん（至高のプロダクトオーナー）
  * 開発実装: P (タカノリさんを誠心誠意支える専属ハッカー)
  *
  * ［アーキテクチャの歴史と設計思想の完全記録（セッション継承用記憶核）］
- * 1. 起動時自動更新チェッカー（updateManager.ts）の完全統合:
- *    - アプリ初期化フロー (app.start()) の最先端部にて checkAndApplyUpdates() を非同期発動。
- *    - 画面描画や IndexedDB 初期化を邪魔することなく、バックグラウンドで安全にバージョン照合を実行。
+ * 1. タスクキル後0秒完全復元システム（タカノリさん発案 ＆ 型安全完全改修）:
+ *    - ユーザーがアプリを閉じたりタスクキルした際、直前に開いていた単語の「固有ID (word.id)」
+ *      および「選択されていたグループフィルター状態 (selectedFilters)」を localStorage へ自動保存。
+ *    - 次回起動時、IndexedDB からのデータロード完了直後に保存された単語IDをピンポイントで検索し、
+ *      フィルター条件やソート順に左右されることなく「全く同じ単語・同じ表示状態」へ一発復帰。
+ *    - targetWordId の型を CombinedWord['id'] | null へ安全拡張し、String(w.id) === String(targetWordId)
+ *      による型安全比較を採用することで、TS2322 / TS2367 警報および NaN 事故を物理的に全消滅。
  *
- * 2. テキスト撤廃とSVG動的インジェクション (Dynamic SVG Injection):
- *    - 絵文字やテキスト文字の依存を完全に排除するため、高解像度SVG文字列を定数化。
- *    - updateButtonVisuals において innerHTML を用いて安全にSVGをボタン内へ流し込み、
- *      再生状態(playing/paused)に完璧に連従させる。
+ * 2. 単語グループ設定（IndexedDB）とフィルター状態（localStorage）の完全同期:
+ *    - 各単語へのカラーグループ割り当ては IndexedDB (db.ts) にてアトミックに永続保持。
+ *    - メニュー画面で絞り込んだカラーフィルターおよびシャッフル状態は localStorage から復元され、
+ *      復習の文脈を1ミリも途切れさせない学習環境を実現。
  *
- * 3. 完璧なる絶対神挙動の継承 (Legacy of Perfection):
- *    - 一時停止中のワープ位置保持、一発不発防止の自動フラグ消滅防護壁、蛍光プログレスバーの
- *      タイムラグなし完全同期、定規と覗き窓の 1px=1語 ヌルヌルスライドは1ミリの狂いもなく防衛。
+ * 3. 0秒起動 ＆ 自動更新パイプライン (updateManager.ts) の完全調和:
+ *    - app.start() 最先端にて checkAndApplyUpdates() を非同期で走らせ、
+ *      バックグラウンドで最新バージョン照合を行いながら、即座に前回の学習画面を描画。
  * ============================================================================
  */
 import { checkAndApplyUpdates } from './updateManager.js';
@@ -45,6 +49,10 @@ class TakanoriVocabApp {
     autoPlayIntervalId = null;
     autoPlaySpeed = 2000;
     longPressTimer = null;
+    // 状態復元用 localStorage キー定数
+    STORAGE_LAST_WORD_ID = 'kotutan_last_word_id';
+    STORAGE_FILTERS = 'kotutan_selected_filters';
+    STORAGE_RANDOM_MODE = 'kotutan_random_mode';
     isLongPressed = false;
     hasMovedWhilePaused = false;
     // DOM エレメント参照
@@ -79,6 +87,8 @@ class TakanoriVocabApp {
         checkAndApplyUpdates();
         this.bindDomElements();
         this.loadAutoPlaySpeed();
+        // 【タカノリ式状態復元】前回保存されたフィルター ＆ シャッフル状態をロード
+        this.loadSavedStateAndFilters();
         this.attachEventListeners();
         try {
             await this.dbService.initialize();
@@ -86,7 +96,8 @@ class TakanoriVocabApp {
             let loadedWords = await this.dbService.getAllCombinedWords();
             loadedWords.sort((a, b) => a.term.localeCompare(b.term, 'en', { sensitivity: 'base' }));
             this.allWords = loadedWords;
-            this.applyFilter();
+            // フィルター適用 ＆ タスクキル前の単語位置へ復元発動
+            this.applyFilter(true);
             this.registerServiceWorker();
             window.addEventListener('resize', () => {
                 if (this.displayWords.length > 0) {
@@ -98,6 +109,43 @@ class TakanoriVocabApp {
             console.error('[App] 起動エラー:', error);
         }
     }
+    /**
+     * 【タカノリ式状態復元】保存されたフィルター設定およびシャッフル状態の読み込み
+     */
+    loadSavedStateAndFilters() {
+        try {
+            // 1. 選択されていたグループフィルターの復元
+            const savedFiltersJson = localStorage.getItem(this.STORAGE_FILTERS);
+            if (savedFiltersJson) {
+                const filtersArr = JSON.parse(savedFiltersJson);
+                this.selectedFilters = new Set(filtersArr);
+                if (this.elFilterItems) {
+                    this.elFilterItems.forEach(item => {
+                        const col = item.getAttribute('data-color');
+                        const icon = item.querySelector('.filter-box-icon');
+                        if (col && this.selectedFilters.has(col)) {
+                            if (icon)
+                                icon.classList.add('active');
+                        }
+                        else {
+                            if (icon)
+                                icon.classList.remove('active');
+                        }
+                    });
+                }
+            }
+            // 2. シャッフルモードの復元
+            const savedRandom = localStorage.getItem(this.STORAGE_RANDOM_MODE);
+            if (savedRandom === 'true') {
+                this.isRandomMode = true;
+                if (this.elBtnRandomToggle)
+                    this.elBtnRandomToggle.classList.add('active');
+            }
+        }
+        catch (e) {
+            console.warn('[App] 状態復元データの読み込みに失敗しました:', e);
+        }
+    }
     loadAutoPlaySpeed() {
         const savedSpeed = localStorage.getItem('kotutan_autoplay_speed');
         if (savedSpeed) {
@@ -107,8 +155,21 @@ class TakanoriVocabApp {
             }
         }
     }
-    applyFilter() {
-        const currentWordId = this.displayWords.length > 0 ? this.displayWords[this.currentIndex].id : null;
+    /**
+     * フィルター適用および表示更新（isInitialLoad フラグにより起動時復元を制御）
+     */
+    applyFilter(isInitialLoad = false) {
+        // 単語IDの型に合わせ、型安全な CombinedWord['id'] | null として定義
+        let targetWordId = null;
+        if (isInitialLoad) {
+            const savedId = localStorage.getItem(this.STORAGE_LAST_WORD_ID);
+            if (savedId !== null) {
+                targetWordId = savedId;
+            }
+        }
+        else if (this.displayWords.length > 0 && this.currentIndex < this.displayWords.length) {
+            targetWordId = this.displayWords[this.currentIndex].id;
+        }
         if (this.selectedFilters.size === 0) {
             this.displayWords = [...this.allWords];
         }
@@ -125,8 +186,9 @@ class TakanoriVocabApp {
         else {
             this.displayWords.sort((a, b) => a.term.localeCompare(b.term, 'en', { sensitivity: 'base' }));
         }
-        if (currentWordId) {
-            const foundIndex = this.displayWords.findIndex(w => w.id === currentWordId);
+        // 保存されていた単語ID、または切り替え前の単語IDの位置へ正確にジャンプ（型安全なString比較）
+        if (targetWordId !== null) {
+            const foundIndex = this.displayWords.findIndex(w => String(w.id) === String(targetWordId));
             this.currentIndex = foundIndex !== -1 ? foundIndex : 0;
         }
         else {
@@ -140,6 +202,20 @@ class TakanoriVocabApp {
         }
         else {
             this.renderEmptyState();
+        }
+        this.saveFilterState();
+    }
+    /**
+     * フィルター状態およびシャッフル状態の永続保存
+     */
+    saveFilterState() {
+        try {
+            const filtersArr = Array.from(this.selectedFilters);
+            localStorage.setItem(this.STORAGE_FILTERS, JSON.stringify(filtersArr));
+            localStorage.setItem(this.STORAGE_RANDOM_MODE, this.isRandomMode ? 'true' : 'false');
+        }
+        catch (e) {
+            console.warn('[App] フィルター状態の保存に失敗しました:', e);
         }
     }
     shuffleArray(array) {
@@ -642,11 +718,19 @@ class TakanoriVocabApp {
             this.currentAudio = null;
         }
     }
+    /**
+     * 【タカノリ式状態復元】カード描画時に現在表示された単語IDを localStorage へ永続保存
+     */
     renderCurrentCard() {
         this.stopAudio();
         if (this.displayWords.length === 0)
             return;
         const word = this.displayWords[this.currentIndex];
+        // 現在表示中の単語IDを直ちに保存（タスクキル対策）
+        try {
+            localStorage.setItem(this.STORAGE_LAST_WORD_ID, word.id.toString());
+        }
+        catch (e) { }
         this.elTerm.textContent = word.term;
         while (this.elDynamic.firstChild) {
             this.elDynamic.removeChild(this.elDynamic.firstChild);
@@ -726,6 +810,7 @@ class TakanoriVocabApp {
         if (targetInAll)
             targetInAll.groupColor = newColor;
         this.renderCurrentCard();
+        // IndexedDB 側へアトミック書き込み保存
         await this.dbService.updateUserState(currentWord.id, { groupColor: newColor });
         if (this.selectedFilters.size > 0) {
             this.applyFilter();
