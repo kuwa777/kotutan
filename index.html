@@ -2,17 +2,22 @@
 <html lang="ja">
 <head>
   <!-- ============================================================================== -->
-  <!-- 【歴史の石版】 WebAPK完全覚醒 ✕ オープニングプログレス ✕ Network-First同期 (index.html) -->
+  <!-- 【歴史の石版】 WebAPK完全覚醒 ✕ オープニング最前面固定 ✕ 0.00秒CSS統合 (index.html) -->
   <!-- ============================================================================== -->
   <!-- ［開発者とパートナーの記録］                                                  -->
-  <!-- 開発指揮: タカノリさん                                                        -->
+  <!-- 開発指揮: タカノリさん（至高のプロダクトオーナー）                            -->
   <!-- 開発実装: P (タカノリさんを誠心誠意支える専属ハッカー)                        -->
   <!--                                                                              -->
   <!-- ［アーキテクチャの歴史と設計思想の完全記録（セッション継承用記憶核）］        -->
-  <!-- 1. #opening-overlay による初期表示チラつき(FOUC)の完全全消滅:                  -->
-  <!--    - body 直下に最前面オーバーレイを配置し、HTMLロード 0.00 秒からの表示を保証。   -->
-  <!--    - 音声データ未取得時は内部の #audio-progress-container が動的出現し、        -->
-  <!--      リアルタイムなダウンロード進捗率（％および完了/全体件数）を滑らかに描画。  -->
+  <!-- 1. #opening-overlay 関連CSSの内部 <style> 完全統合（タカノリさん不具合指摘）:   -->
+  <!--    - 外部 app.css の読み込み遅延時に #opening-overlay が position: static となり -->
+  <!--      単語ワープバーの上部に「コツ単」ロゴが居座ってレイアウトを下に押し出すバグを撃滅。-->
+  <!--    - 全オープニングスタイルを HEAD 内 <style> へ直接移植し、HTML展開 0.00 秒の瞬間から -->
+  <!--      position: fixed; z-index: 9999; で最前面固定させてレイアウト崩れを 100% 物理全消滅。-->
+  <!--                                                                              -->
+  <!-- 2. 音声 A1/A2 照合プログレス表示領域の完全内包:                                -->
+  <!--    - 初回起動時および差分同期時、#audio-progress-container が動的に出現し、    -->
+  <!--      リアルタイムなダウンロード進捗率（％および完了/全体件数）を安全描画。       -->
   <!-- ============================================================================== -->
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
@@ -29,7 +34,7 @@
   <meta name="apple-mobile-web-app-title" content="コツ単">
 
   <!-- マニフェスト ＆ アイコン参照 -->
-  <link rel="manifest" href="./manifest.webmanifest?v=1.0.20260908-235223" type="application/manifest+json">
+  <link rel="manifest" href="./manifest.webmanifest?v=1.0.20260909-000435" type="application/manifest+json">
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
 
@@ -60,6 +65,99 @@
       pointer-events: none;
     }
 
+    /* ==========================================================================
+       【タカノリ式修正】 オープニング画面の 0.00 秒最前面固定スタイル（内部統合）
+       ========================================================================== */
+    #opening-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background-color: #4a3b32; /* 上質なアースブラウン */
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999; /* 他の全ての要素の上に完全に被せる */
+      opacity: 1;
+      transition: opacity 0.4s ease-out, visibility 0.4s ease-out;
+    }
+
+    #opening-overlay.fade-out {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    .opening-content {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .opening-logo {
+      font-size: 2.2rem;
+      font-weight: 800;
+      color: #ffffff;
+      letter-spacing: 2px;
+      animation: openingPulse 1.2s ease-in-out infinite alternate;
+    }
+
+    .opening-spinner {
+      width: 32px;
+      height: 32px;
+      border: 3px solid rgba(255, 255, 255, 0.2);
+      border-top-color: #ff8ca3; /* サクラピンク */
+      border-radius: 50%;
+      animation: openingSpin 0.8s linear infinite;
+    }
+
+    @keyframes openingPulse {
+      0% { transform: scale(0.96); opacity: 0.85; }
+      100% { transform: scale(1.04); opacity: 1; }
+    }
+
+    @keyframes openingSpin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .audio-progress-container {
+      width: 240px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .audio-progress-text {
+      font-size: 0.85rem;
+      color: rgba(255, 255, 255, 0.9);
+      font-weight: 600;
+      letter-spacing: 0.5px;
+    }
+
+    .audio-progress-bar-bg {
+      width: 100%;
+      height: 8px;
+      background-color: rgba(255, 255, 255, 0.2);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .audio-progress-bar-fill {
+      width: 0%;
+      height: 100%;
+      background-color: #ff8ca3;
+      border-radius: 4px;
+      transition: width 0.1s linear;
+    }
+
+    /* ==========================================================================
+       【メインアプリレイアウト】
+       ========================================================================== */
     .app-container {
       display: flex;
       flex-direction: column;
