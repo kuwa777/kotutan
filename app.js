@@ -1,30 +1,24 @@
 /**
  * ============================================================================
- * 【歴史の石版】 コツ単 全SVGベクター ✕ オープニング1秒 ✕ 音声A1/A2照合 ✕ 復元 (app.ts)
+ * 【歴史の石版】 コツ単 全SVGベクター ✕ オープニング1秒 ✕ 完全同期 ✕ 復元 (app.ts)
  * ============================================================================
  * ［開発者とパートナーの記録］
  * 開発指揮: タカノリさん（至高のプロダクトオーナー / アルゴリズム設計者）
  * 開発実装: P (タカノリさんを誠心誠意支える専属ハッカー)
  *
  * ［アーキテクチャの歴史と設計思想の完全記録（セッション継承用記憶核）］
- * 1. タカノリ式 A1/A2 照合音声同期 (Audio Cache Integration) の起動時完全統合:
- *    - IndexedDB データロード完了直後、AudioCacheManager.syncAudioFiles() を非同期呼び出し。
- *    - A1（前回マニフェスト）と A2（最新）をぶつけ、追加・更新・削除対象の差分音声を一発算出。
- *    - 未取得音声が存在する場合、オープニング画面にプログレスバーを動的表示し、
- *      全件ロードが 100% 完遂してからアプリ画面を開く安全構造を確立。
+ * 1. 1秒最低保証オープニング ✕ 全自動音声プログレス連動:
+ *    - 起動時、#opening-overlay が 0.00 秒から最前面を被覆。
+ *    - IndexedDB ロード直後に AudioCacheManager.syncAudioFiles() を発動し、未取得音声がある場合のみ
+ *      動的にプログレスバー（%および完了/全体件数）を表示して全件ダウンロードを見せ切る。
  *
- * 2. 最低1秒保証オープニングアニメーション＆並列ロード:
- *    - #opening-overlay により、アプリ読み込み 0.00 秒からの高級感あるアニメを表示。
- *    - app.start() 内で Promise.all を使用し、「最低 1000ms タイマー」と「初期化＆音声同期」
- *      を完全に並列実行。ロード完了後に 0.4s のCSSフェードアウトで極上の画面切り替えを実現。
+ * 2. 無応答事故防止の 60 秒セーフティタイムアウト:
+ *    - 通常通信時は進捗バーを 100% まで表示し切ってから幕を下ろす。
+ *    - 極端な回線障害時も Promise.race による 60 秒上限で安全にアプリ画面を開く防護壁を確立。
  *
- * 3. 完全オフライン優先音声再生 (Cache-First Offline Player):
- *    - playCurrentSmartAudio() にて AudioCacheManager.getAudioElement() を呼び出し。
- *      電波のない機内や地下鉄であっても、Cache API 内のローカル Blob から 100% 即座に再生。
- *
- * 4. タスクキル後0秒完全復元システム ＆ 型安全防御の継承:
- *    - ユーザーがアプリを閉じた際の単語ID (word.id) および フィルター・シャッフル状態を保存。
- *      String(w.id) === String(targetWordId) による型安全比較で、復元位置へ一発復帰。
+ * 3. タスクキル後0秒完全復元システム ＆ 型安全比較:
+ *    - String(w.id) === String(targetWordId) による型安全比較により、閉じる直前の単語カード・
+ *      選択フィルター・シャッフル状態へ一発復帰。TS2322/TS2367 警報も完全全消滅。
  * ============================================================================
  */
 import { checkAndApplyUpdates } from './updateManager.js';
@@ -95,22 +89,20 @@ class TakanoriVocabApp {
         checkAndApplyUpdates();
         this.bindDomElements();
         this.loadAutoPlaySpeed();
-        // 前回保存されたフィルター ＆ シャッフル状態をロード
         this.loadSavedStateAndFilters();
         this.attachEventListeners();
-        // 2. 【タカノリ式 1秒オープニング ✕ バックグラウンド初期化＆音声同期の並列実行】
+        // 2. 最低 1000ms の演出タイマー
         const minAnimationPromise = new Promise(resolve => setTimeout(resolve, 1000));
-        const initialLoadPromise = (async () => {
+        try {
             await this.dbService.initialize();
             const currentVersionHash = await this.checkAndSyncVersion();
             let loadedWords = await this.dbService.getAllCombinedWords();
             loadedWords.sort((a, b) => a.term.localeCompare(b.term, 'en', { sensitivity: 'base' }));
             this.allWords = loadedWords;
-            // フィルター適用 ＆ タスクキル前の単語位置へ復元発動
+            // 画面の裏側でカードとスクラバーの位置を 0 秒復元
             this.applyFilter(true);
-            // 【タカノリ式 A1/A2 照合音声同期を発動】
-            await AudioCacheManager.syncAudioFiles(this.allWords, currentVersionHash, (completed, total, percent) => {
-                // 未キャッシュ・更新対象の音声が存在する場合のみプログレスバーを可視化
+            // 3. 音声同期処理（最大60秒の絶対無応答事故防止セーフティ付き）
+            const syncPromise = AudioCacheManager.syncAudioFiles(this.allWords, currentVersionHash, (completed, total, percent) => {
                 if (this.elAudioProgressContainer && percent < 100) {
                     if (this.elOpeningSpinner)
                         this.elOpeningSpinner.style.display = 'none';
@@ -123,17 +115,15 @@ class TakanoriVocabApp {
                     }
                 }
             });
+            const maxWaitPromise = new Promise(resolve => setTimeout(resolve, 60000));
+            // 最低1秒タイマー ＋ (音声同期 OR 60秒タイムアウト) を待って安全に画面を開く
+            await Promise.all([minAnimationPromise, Promise.race([syncPromise, maxWaitPromise])]);
             this.registerServiceWorker();
-        })();
-        try {
-            // 最低1秒タイマーとデータ＆音声ロードが「両方完遂」するまで待機
-            await Promise.all([minAnimationPromise, initialLoadPromise]);
         }
         catch (error) {
-            console.error('[App] 起動・データロードエラー:', error);
+            console.error('[App] 起動時エラー (安全にフォールバック):', error);
         }
         finally {
-            // 3. 全てが整ったらオープニング画面を滑らかにフェードアウト離脱
             this.dismissOpeningOverlay();
         }
         window.addEventListener('resize', () => {
@@ -156,9 +146,6 @@ class TakanoriVocabApp {
             }, 400);
         }
     }
-    /**
-     * 保存されたフィルター設定およびシャッフル状態の読み込み
-     */
     loadSavedStateAndFilters() {
         try {
             const savedFiltersJson = localStorage.getItem(this.STORAGE_FILTERS);
@@ -200,9 +187,6 @@ class TakanoriVocabApp {
             }
         }
     }
-    /**
-     * フィルター適用および表示更新（isInitialLoad フラグにより起動時復元を制御）
-     */
     applyFilter(isInitialLoad = false) {
         let targetWordId = null;
         if (isInitialLoad) {
@@ -298,9 +282,6 @@ class TakanoriVocabApp {
         this.stopAudio();
         this.stopProgressBar();
     }
-    /**
-     * バージョンチェック ＆ 同期（現在のバージョンハッシュを返却）
-     */
     async checkAndSyncVersion() {
         let currentHash = '1.0.0';
         try {
@@ -768,15 +749,11 @@ class TakanoriVocabApp {
             this.currentAudio = null;
         }
     }
-    /**
-     * 【タカノリ式状態復元】カード描画時に現在表示された単語IDを localStorage へ永続保存
-     */
     renderCurrentCard() {
         this.stopAudio();
         if (this.displayWords.length === 0)
             return;
         const word = this.displayWords[this.currentIndex];
-        // 現在表示中の単語IDを直ちに保存（タスクキル対策）
         try {
             localStorage.setItem(this.STORAGE_LAST_WORD_ID, word.id.toString());
         }
@@ -860,15 +837,11 @@ class TakanoriVocabApp {
         if (targetInAll)
             targetInAll.groupColor = newColor;
         this.renderCurrentCard();
-        // IndexedDB 側へアトミック書き込み保存
         await this.dbService.updateUserState(currentWord.id, { groupColor: newColor });
         if (this.selectedFilters.size > 0) {
             this.applyFilter();
         }
     }
-    /**
-     * 完全オフライン対応：Cache API 優先スマート音声再生
-     */
     async playCurrentSmartAudio() {
         if (this.displayWords.length === 0)
             return;
@@ -880,7 +853,6 @@ class TakanoriVocabApp {
         if (!targetFilename)
             return;
         this.stopAudio();
-        // Cache API 内のローカル Blob から優先読み込み
         const audio = await AudioCacheManager.getAudioElement(targetFilename);
         if (!audio)
             return;
