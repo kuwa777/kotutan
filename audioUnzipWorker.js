@@ -1,3 +1,4 @@
+"use strict";
 /**
  * ============================================================================
  * 【歴史の石版】 コツ単 音声Zipバックグラウンド解凍ワーカー (audioUnzipWorker.ts)
@@ -7,10 +8,9 @@
  * 開発実装: P (タカノリさんを誠心誠意支える専属ハッカー)
  *
  * ［アーキテクチャの歴史と設計思想の完全記録（セッション継承用記憶核）］
- * 1. 型定義 Export (Type-Only Export) による TS2306 エラーの完全全消滅:
- *    - interface に export を付与することで、TypeScript コンパイラへ正当なモジュールとして認識させる。
- *    - JS コンパイル時に型定義は消去されるため、出力される JS ファイルには export キーワードが残らず、
- *      ブラウザ側では純粋な Classic Worker として 100% 安全に動作する。
+ * 1. export キーワードの完全全廃による Unexpected token 'export' の物理全消滅:
+ *    - TS ファイル内から export を完全に排除し、純粋な Classic Worker スクリプトとして構築。
+ *    - コンパイル後の JS ファイルに export 構文が一切出力されないため、ブラウザで SyntaxError が 100% 発生しない。
  *
  * 2. Classic Worker スレッドでの完全ローカルオフライン動作:
  *    - importScripts('./lib/fflate.min.js') を安全に同期実行し、外部通信を一切挟まず
@@ -48,4 +48,3 @@ self.onmessage = (e) => {
         self.postMessage(response);
     }
 };
-export {};
