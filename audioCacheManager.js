@@ -58,12 +58,19 @@ export class AudioCacheManager {
                     onProgress(100);
                 return;
             }
-            if (onProgress) {
-                const initialPercent = Math.min(99, Math.floor((currentCompletedBytes / totalBytes) * 100));
-                onProgress(initialPercent);
-            }
-            // 3. Web Worker の開始
-            const worker = new Worker('audioUnzipWorker.js', { type: 'module' });
+            // 進捗逆戻り防止ガード用変数
+            let lastReportedPercent = 0;
+            const reportProgress = (calculatedPercent) => {
+                if (!onProgress)
+                    return;
+                const safePercent = Math.max(lastReportedPercent, Math.min(99, calculatedPercent));
+                lastReportedPercent = safePercent;
+                onProgress(safePercent);
+            };
+            const initialPercent = Math.floor((currentCompletedBytes / totalBytes) * 100);
+            reportProgress(initialPercent);
+            // 3. Web Worker の開始 (Classic Worker として読み込み)
+            const worker = new Worker('audioUnzipWorker.js');
             try {
                 for (const chunk of pendingChunks) {
                     try {
@@ -76,10 +83,7 @@ export class AudioCacheManager {
                         // ダウンロード完了時点（該打包サイズの 50% 重みを進捗加算）
                         const downloadWeightBytes = Math.floor(chunk.size * 0.5);
                         let interimBytes = currentCompletedBytes + downloadWeightBytes;
-                        if (onProgress) {
-                            const p = Math.min(99, Math.floor((interimBytes / totalBytes) * 100));
-                            onProgress(p);
-                        }
+                        reportProgress(Math.floor((interimBytes / totalBytes) * 100));
                         const zipBuffer = await res.arrayBuffer();
                         // Worker へ解凍要求（10秒解凍タイムアウト保護付き）
                         const unzipResult = await new Promise((resolve) => {
@@ -102,7 +106,6 @@ export class AudioCacheManager {
                             for (const file of unzipResult.files) {
                                 const audioUrl = `audio/${file.filename}`;
                                 const mimeType = getMimeType(file.filename);
-                                // 【タカノリ式ゼロコピー最適解】as unknown as BodyInit により型エラーを完全消滅させて直接保存
                                 const response = new Response(file.buffer, {
                                     headers: { 'Content-Type': mimeType }
                                 });
@@ -112,19 +115,17 @@ export class AudioCacheManager {
                             localStorage.setItem(CHUNKS_STORAGE_KEY, JSON.stringify(completedChunksMap));
                             // 解凍・格納完了時点（残り 50% 重みを確定加算）
                             currentCompletedBytes += chunk.size;
-                            if (onProgress) {
-                                const p = Math.min(100, Math.floor((currentCompletedBytes / totalBytes) * 100));
-                                onProgress(p);
-                            }
+                            reportProgress(Math.floor((currentCompletedBytes / totalBytes) * 100));
                         }
                     }
                     catch (e) {
                         console.warn(`[AudioCache] チャンク処理スキップ (${chunk.name}):`, e);
                     }
                 }
+                if (onProgress)
+                    onProgress(100);
             }
             finally {
-                // 例外発生時でも100%確実に Worker リソースを破棄しメモリリークを阻止
                 worker.terminate();
             }
         }
