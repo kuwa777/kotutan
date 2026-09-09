@@ -1,3 +1,5 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
 /**
  * ============================================================================
  * 【歴史の石版】 コツ単 全SVGベクター ✕ オープニング1秒 ✕ 完全同期 ✕ 復元 (app.ts)
@@ -7,23 +9,22 @@
  * 開発実装: P (タカノリさんを誠心誠意支える専属ハッカー)
  *
  * ［アーキテクチャの歴史と設計思想の完全記録（セッション継承用記憶核）］
- * 1. 1秒最低保証オープニング ✕ 全自動音声プログレス連動:
- *    - 起動時、#opening-overlay が 0.00 秒から最前面を被覆[cite: 5, 6]。
- *    - IndexedDB ロード直後に AudioCacheManager.syncAudioFiles() を発動し、未取得音声がある場合のみ
- *      動的にプログレスバー（%および完了/全体件数）を表示して全件ダウンロードを見せ切る[cite: 5, 6]。
+ * 1. 1秒最低保証オープニング ✕ パーセンテージ単一プログレス表示:
+ *    - タカノリさんのご指示に従い、「音声データを準備中... 43%」と直感的かつシンプルな
+ *      パーセンテージ表示のみを採用。100% に到達した時点でダウンロード＆解凍が完了する。
  *
  * 2. 無応答事故防止の 60 秒セーフティタイムアウト:
- *    - 通常通信時は進捗バーを 100% まで表示し切ってから幕を下ろす[cite: 5]。
- *    - 極端な回線障害時も Promise.race による 60 秒上限で安全にアプリ画面を開く防護壁を確立[cite: 5]。
+ *    - 通常通信時は進捗バーを 100% まで表示し切ってから幕を下ろす。
+ *    - 極端な回線障害時も Promise.race による 60 秒上限で安全にアプリ画面を開く防護壁を確立。
  *
  * 3. タスクキル後0秒完全復元システム ＆ 型安全比較:
  *    - String(w.id) === String(targetWordId) による型安全比較により、閉じる直前の単語カード・
- *      選択フィルター・シャッフル状態へ一発復帰[cite: 4, 5]。TS2322/TS2367 警報も完全全消滅[cite: 4, 5]。
+ *      選択フィルター・シャッフル状態へ一発復帰。
  * ============================================================================
  */
-import { checkAndApplyUpdates } from './updateManager.js';
-import { DatabaseService } from './db.js';
-import { AudioCacheManager } from './audioCacheManager.js';
+const updateManager_js_1 = require("./updateManager.js");
+const db_js_1 = require("./db.js");
+const audioCacheManager_js_1 = require("./audioCacheManager.js");
 // 洗練されたSVGベクターアイコン群の定義
 const ICON_PREV = `<svg class="icon" viewBox="0 0 24 24" fill="currentColor"><polygon points="18 4 4 12 18 20 18 4"></polygon></svg>`;
 const ICON_NEXT = `<svg class="icon" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 4 20 12 6 20 6 4"></polygon></svg>`;
@@ -82,11 +83,11 @@ class TakanoriVocabApp {
     elProgressContainer;
     elProgressFill;
     constructor() {
-        this.dbService = new DatabaseService();
+        this.dbService = new db_js_1.DatabaseService();
     }
     async start() {
-        // 1. 背景で安全に自動更新チェックを発動（非同期実行）
-        checkAndApplyUpdates();
+        // 1. 背景で安全に自動更新チェックを発動
+        (0, updateManager_js_1.checkAndApplyUpdates)();
         this.bindDomElements();
         this.loadAutoPlaySpeed();
         this.loadSavedStateAndFilters();
@@ -101,14 +102,14 @@ class TakanoriVocabApp {
             this.allWords = loadedWords;
             // 画面の裏側でカードとスクラバーの位置を 0 秒復元
             this.applyFilter(true);
-            // 3. 音声同期処理（最大60秒の絶対無応答事故防止セーフティ付き）
-            const syncPromise = AudioCacheManager.syncAudioFiles(this.allWords, currentVersionHash, (completed, total, percent) => {
+            // 3. タカノリ式 シンプル% 音声同期処理（60秒絶対無応答事故防止セーフティ付き）
+            const syncPromise = audioCacheManager_js_1.AudioCacheManager.syncAudioFiles(this.allWords, currentVersionHash, (percent) => {
                 if (this.elAudioProgressContainer && percent < 100) {
                     if (this.elOpeningSpinner)
                         this.elOpeningSpinner.style.display = 'none';
                     this.elAudioProgressContainer.style.display = 'flex';
                     if (this.elAudioProgressText) {
-                        this.elAudioProgressText.textContent = `音声データを準備中... ${percent}% (${completed}/${total})`;
+                        this.elAudioProgressText.textContent = `音声データを準備中... ${percent}%`;
                     }
                     if (this.elAudioProgressFill) {
                         this.elAudioProgressFill.style.width = `${percent}%`;
@@ -132,9 +133,6 @@ class TakanoriVocabApp {
             }
         });
     }
-    /**
-     * オープニングアニメーションをフェードアウト消去
-     */
     dismissOpeningOverlay() {
         if (this.elOpeningOverlay) {
             this.elOpeningOverlay.classList.add('fade-out');
@@ -853,7 +851,7 @@ class TakanoriVocabApp {
         if (!targetFilename)
             return;
         this.stopAudio();
-        const audio = await AudioCacheManager.getAudioElement(targetFilename);
+        const audio = await audioCacheManager_js_1.AudioCacheManager.getAudioElement(targetFilename);
         if (!audio)
             return;
         this.currentAudio = audio;

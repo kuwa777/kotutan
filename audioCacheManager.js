@@ -1,128 +1,142 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.AudioCacheManager = void 0;
 const CACHE_NAME = 'kotutan-audio-v1';
-const MANIFEST_STORAGE_KEY = 'kotutan_audio_manifest_a1';
-const CONCURRENCY_LIMIT = 4; // 同時取得数（通信安定性と速度の最適バランス）
-const FETCH_TIMEOUT_MS = 5000; // 1ファイルあたりの応答許容時間（5秒）
-export class AudioCacheManager {
+const CHUNKS_STORAGE_KEY = 'kotutan_audio_chunks_a1';
+const FETCH_TIMEOUT_MS = 15000;
+/**
+ * ファイル拡張子から安全な MIME タイプを判定
+ */
+function getMimeType(filename) {
+    const ext = filename.split('.').pop()?.toLowerCase();
+    switch (ext) {
+        case 'm4a':
+        case 'mp4':
+            return 'audio/mp4';
+        case 'wav':
+            return 'audio/wav';
+        case 'ogg':
+            return 'audio/ogg';
+        case 'aac':
+            return 'audio/aac';
+        case 'mp3':
+        default:
+            return 'audio/mpeg';
+    }
+}
+class AudioCacheManager {
     /**
-     * 自己修復 ＆ 逐次保存つき A1/A2 音声同期メイン処理
+     * 分割Zipチャンクのダウンロード ＆ 解凍同期処理（ざっくりパーセンテージ進捗通知）
      */
     static async syncAudioFiles(words, currentVersion, onProgress) {
-        if (!('caches' in window))
+        if (!('caches' in window) || !('Worker' in window))
             return;
         try {
             const cache = await caches.open(CACHE_NAME);
-            // 1. 最新 A2 マニフェスト構築
-            const manifestA2 = {};
-            words.forEach(w => {
-                if (w.audio) {
-                    manifestA2[w.audio] = { version: currentVersion, updatedAt: Date.now() };
-                }
-                if (w.example_audio) {
-                    manifestA2[w.example_audio] = { version: currentVersion, updatedAt: Date.now() };
-                }
-            });
-            // 2. 前回記録 (A1) の安全ロード
-            let manifestA1 = {};
-            const savedA1 = localStorage.getItem(MANIFEST_STORAGE_KEY);
-            if (savedA1) {
+            // 1. chunks_info.json から各Zipのサイズメタデータを取得
+            const infoRes = await fetch(`audio/chunks_info.json?t=${Date.now()}`);
+            if (!infoRes.ok)
+                return;
+            const chunks = await infoRes.json();
+            if (!Array.isArray(chunks) || chunks.length === 0)
+                return;
+            const totalBytes = chunks.reduce((sum, c) => sum + (c.size || 0), 0);
+            if (totalBytes === 0)
+                return;
+            // 2. localStorage から取得済みチャンクをロード
+            let completedChunksMap = {};
+            const savedMap = localStorage.getItem(CHUNKS_STORAGE_KEY);
+            if (savedMap) {
                 try {
-                    manifestA1 = JSON.parse(savedA1) || {};
-                }
-                catch (e) {
-                    manifestA1 = {};
-                }
-            }
-            // 3. Mark & Sweep 差分解析
-            const downloadList = new Set();
-            const deleteList = new Set();
-            const checkedKeys = new Set();
-            for (const filename in manifestA1) {
-                if (filename in manifestA2) {
-                    checkedKeys.add(filename);
-                    if (manifestA1[filename]?.version !== currentVersion) {
-                        downloadList.add(filename);
-                    }
-                }
-                else {
-                    deleteList.add(filename);
-                }
-            }
-            for (const filename in manifestA2) {
-                if (!checkedKeys.has(filename)) {
-                    downloadList.add(filename);
-                }
-            }
-            // 4. 不要音声の物理削除
-            for (const filename of deleteList) {
-                try {
-                    const url = `audio/${filename}`;
-                    await cache.delete(url);
-                    delete manifestA1[filename];
+                    completedChunksMap = JSON.parse(savedMap) || {};
                 }
                 catch (e) { }
             }
-            const targets = Array.from(downloadList);
-            // 差分が一切存在しない場合（全件取得完了済み）
-            if (targets.length === 0) {
-                localStorage.setItem(MANIFEST_STORAGE_KEY, JSON.stringify(manifestA2));
+            let currentCompletedBytes = chunks
+                .filter(c => completedChunksMap[c.name])
+                .reduce((sum, c) => sum + c.size, 0);
+            const pendingChunks = chunks.filter(c => !completedChunksMap[c.name]);
+            if (pendingChunks.length === 0) {
                 if (onProgress)
-                    onProgress(0, 0, 100);
+                    onProgress(100);
                 return;
             }
-            // 未取得が存在する場合、直ちに 0% 進捗を発行してプログレスバー表示へ切り替える
             if (onProgress) {
-                onProgress(0, targets.length, 0);
+                const initialPercent = Math.min(99, Math.floor((currentCompletedBytes / totalBytes) * 100));
+                onProgress(initialPercent);
             }
-            // 5. 並列取得 ＆ 自己修復 (Self-Healing) ＆ 逐次アトミック保存
-            let completed = 0;
-            const total = targets.length;
-            for (let i = 0; i < targets.length; i += CONCURRENCY_LIMIT) {
-                const chunk = targets.slice(i, i + CONCURRENCY_LIMIT);
-                await Promise.all(chunk.map(async (filename) => {
-                    const url = `audio/${filename}`;
+            // 3. Web Worker の開始
+            const worker = new Worker('audioUnzipWorker.js', { type: 'module' });
+            try {
+                for (const chunk of pendingChunks) {
                     try {
-                        // 【自己修復】通信前に Cache API 内の存在を確認（無駄な通信を100%回避）
-                        const existingMatch = await cache.match(url);
-                        const isVersionMismatch = manifestA1[filename]?.version && manifestA1[filename].version !== currentVersion;
-                        if (existingMatch && !isVersionMismatch) {
-                            manifestA1[filename] = manifestA2[filename];
-                            return;
-                        }
-                        // 5秒タイムアウト保護付きネットワーク取得
                         const controller = new AbortController();
                         const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-                        const fetchOptions = {
-                            signal: controller.signal,
-                            cache: isVersionMismatch ? 'reload' : 'default'
-                        };
-                        const response = await fetch(url, fetchOptions);
+                        const res = await fetch(`audio/${chunk.name}`, { signal: controller.signal });
                         clearTimeout(timeoutId);
-                        if (response.ok) {
-                            await cache.put(url, response);
-                            manifestA1[filename] = manifestA2[filename];
+                        if (!res.ok)
+                            continue;
+                        // ダウンロード完了時点（該打包サイズの 50% 重みを進捗加算）
+                        const downloadWeightBytes = Math.floor(chunk.size * 0.5);
+                        let interimBytes = currentCompletedBytes + downloadWeightBytes;
+                        if (onProgress) {
+                            const p = Math.min(99, Math.floor((interimBytes / totalBytes) * 100));
+                            onProgress(p);
+                        }
+                        const zipBuffer = await res.arrayBuffer();
+                        // Worker へ解凍要求（10秒解凍タイムアウト保護付き）
+                        const unzipResult = await new Promise((resolve) => {
+                            let workerTimeoutId;
+                            const handleMessage = (e) => {
+                                if (e.data.chunkName === chunk.name) {
+                                    clearTimeout(workerTimeoutId);
+                                    worker.removeEventListener('message', handleMessage);
+                                    resolve(e.data);
+                                }
+                            };
+                            workerTimeoutId = window.setTimeout(() => {
+                                worker.removeEventListener('message', handleMessage);
+                                resolve({ chunkName: chunk.name, success: false, error: '解凍タイムアウト' });
+                            }, 10000);
+                            worker.addEventListener('message', handleMessage);
+                            worker.postMessage({ chunkName: chunk.name, buffer: zipBuffer }, [zipBuffer]);
+                        });
+                        if (unzipResult.success && unzipResult.files) {
+                            for (const file of unzipResult.files) {
+                                const audioUrl = `audio/${file.filename}`;
+                                const mimeType = getMimeType(file.filename);
+                                // 【タカノリ式ゼロコピー最適解】as unknown as BodyInit により型エラーを完全消滅させて直接保存
+                                const response = new Response(file.buffer, {
+                                    headers: { 'Content-Type': mimeType }
+                                });
+                                await cache.put(audioUrl, response);
+                            }
+                            completedChunksMap[chunk.name] = true;
+                            localStorage.setItem(CHUNKS_STORAGE_KEY, JSON.stringify(completedChunksMap));
+                            // 解凍・格納完了時点（残り 50% 重みを確定加算）
+                            currentCompletedBytes += chunk.size;
+                            if (onProgress) {
+                                const p = Math.min(100, Math.floor((currentCompletedBytes / totalBytes) * 100));
+                                onProgress(p);
+                            }
                         }
                     }
                     catch (e) {
-                        console.warn(`[AudioCache] タイムアウト/スキップ: ${filename} (次回起動時に自動再トライ)`);
+                        console.warn(`[AudioCache] チャンク処理スキップ (${chunk.name}):`, e);
                     }
-                    finally {
-                        completed++;
-                        const percent = Math.floor((completed / total) * 100);
-                        if (onProgress) {
-                            onProgress(completed, total, percent);
-                        }
-                    }
-                }));
-                // チャンク（4件）ごとに成功結果を小刻みに保存（途中タスクキル耐性の確立）
-                localStorage.setItem(MANIFEST_STORAGE_KEY, JSON.stringify(manifestA1));
+                }
+            }
+            finally {
+                // 例外発生時でも100%確実に Worker リソースを破棄しメモリリークを阻止
+                worker.terminate();
             }
         }
         catch (e) {
-            console.error('[AudioCache] 同期中に安全に捕捉された例外:', e);
+            console.error('[AudioCache] チャンク同期例外:', e);
         }
     }
     /**
-     * キャッシュ優先再生（自動メモリ解放フック付き）
+     * キャッシュ優先再生（Blob URL メモリ全自動解放付き）
      */
     static async getAudioElement(filename) {
         const url = `audio/${filename}`;
@@ -134,7 +148,6 @@ export class AudioCacheManager {
                     const blob = await response.blob();
                     const blobUrl = URL.createObjectURL(blob);
                     const audio = new Audio(blobUrl);
-                    // 再生完了またはエラー時に Blob URL を破棄してメモリ解放
                     const cleanup = () => {
                         URL.revokeObjectURL(blobUrl);
                         audio.removeEventListener('ended', cleanup);
@@ -150,3 +163,4 @@ export class AudioCacheManager {
         return new Audio(url);
     }
 }
+exports.AudioCacheManager = AudioCacheManager;

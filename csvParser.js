@@ -1,3 +1,4 @@
+"use strict";
 /**
  * ============================================================================
  * 【歴史の石版】 CSV自動解析モジュール (csvParser.ts)
@@ -17,11 +18,14 @@
  *    - Unicode NFC 正規化によるインデックス不全および DoS 攻撃の物理防御。
  * ============================================================================
  */
-import { LIMITS } from './constants.js';
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.decodeCsvBuffer = decodeCsvBuffer;
+exports.parseWordCsv = parseWordCsv;
+const constants_js_1 = require("./constants.js");
 /**
  * ArrayBuffer から UTF-8 / Shift-JIS (CP932) を自動判定して文字列にデコードする
  */
-export function decodeCsvBuffer(buffer) {
+function decodeCsvBuffer(buffer) {
     const bytes = new Uint8Array(buffer);
     // 1. UTF-8 BOM (\uFEFF) の存在確認
     if (bytes.length >= 3 && bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) {
@@ -41,7 +45,7 @@ export function decodeCsvBuffer(buffer) {
 /**
  * CSVテキストをパースし、MasterWord オブジェクト配列へ安全に変換する
  */
-export function parseWordCsv(csvText) {
+function parseWordCsv(csvText) {
     if (!csvText || typeof csvText !== 'string') {
         return { words: [], totalCount: 0 };
     }
@@ -127,7 +131,7 @@ export function parseWordCsv(csvText) {
     const parsedWords = [];
     for (let i = startRowIndex; i < rows.length; i++) {
         const row = rows[i];
-        if (parsedWords.length >= LIMITS.MAX_WORDS_PER_IMPORT)
+        if (parsedWords.length >= constants_js_1.LIMITS.MAX_WORDS_PER_IMPORT)
             break;
         const rawTerm = termIdx !== -1 && row[termIdx] ? row[termIdx] : '';
         const rawIpa = ipaIdx !== -1 && row[ipaIdx] ? row[ipaIdx] : '';
@@ -137,10 +141,10 @@ export function parseWordCsv(csvText) {
         if (!rawTerm.trim() && !rawDef.trim())
             continue;
         parsedWords.push({
-            term: rawTerm.normalize('NFC').trim().slice(0, LIMITS.MAX_WORD_TERM_LENGTH),
+            term: rawTerm.normalize('NFC').trim().slice(0, constants_js_1.LIMITS.MAX_WORD_TERM_LENGTH),
             ipa: rawIpa ? rawIpa.normalize('NFC').trim() : '',
             pos: rawPos ? rawPos.normalize('NFC').trim() : '',
-            def: rawDef.normalize('NFC').trim().slice(0, LIMITS.MAX_WORD_DEF_LENGTH),
+            def: rawDef.normalize('NFC').trim().slice(0, constants_js_1.LIMITS.MAX_WORD_DEF_LENGTH),
             example: rawEx ? rawEx.normalize('NFC').trim() : '',
             audio: '', // CSV読み込み時はデフォルト空文字
         });
