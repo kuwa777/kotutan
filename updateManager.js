@@ -12,26 +12,24 @@
  *
  * ［アーキテクチャの歴史と設計思想の完全記録（セッション継承用記憶核）］
  * 1. TS直接保持バージョン（APP_VERSION）対話比較構造:
- *    - build-deploy.js により 1.0.20260910-021935 プレースホルダーへタイムスタンプが自動注入され、
+ *    - build-deploy.js により 1.0.20260910-023509 プレースホルダーへタイムスタンプが自動注入され、
  *      現在実行中のコード自身とサーバーの version.json を直接比較。
  *
- * 2. 5重の絶対防壁 ＋ SW一時解体（Unregister）による100%即時画面差替:
+ * 2. HTTP キャッシュ物理無効化 ＋ 5重の絶対防壁 ＋ SW一時解体（Unregister）による100%即時画面差替:
  *    - 防壁①: 2.0秒の AbortController 厳格タイムアウト（0秒オフライン起動保護）
  *    - 防壁②: レスポンスの正規表現型検証（404や不完全データの棄却）
  *    - 防壁③: sessionStorage サーキットブレーカー（無限リロード物理全消滅）
  *    - 防壁④: 1.2秒間の全画面透明操作遮断幕（更新中の誤操作防止）
- *    - 防壁⑤: SW一時解体(unregister) ＆ 全キャッシュパージ ➔ 即時リロード（一発で最新画面反映）
+ *    - 防壁⑤: cache: 'no-store' ＆ タイムスタンプクエリによるHTTPキャッシュ突破
+ *    - 防壁⑥: SW一時解体(unregister) ＆ 全キャッシュパージ ➔ 即時リロード（一発で最新画面反映）
  * ============================================================================
  */
 // ビルド時に build-deploy.js によってタイムスタンプ（例: 1.0.YYYYMMDD-HHmmss）が注入されます
-export const APP_VERSION = '1.0.20260910-021935';
+export const APP_VERSION = '1.0.20260910-023509';
 const TIMEOUT_MS = 2000; // サーバー通信の厳格タイムアウト（2秒）
 const GRACE_PERIOD_MS = 1200; // 更新前トースト表示 ＆ キャッシュ破棄の猶予時間（1.2秒）
 const SESSION_ATTEMPT_KEY = 'kotutan_update_attempted_ver';
 const SESSION_COMPLETED_KEY = 'kotutan_update_just_completed';
-/**
- * 画面上に温かみのあるトースト通知を動的生成・表示する内部関数
- */
 function showToast(message, isWarning = false) {
     const existingToast = document.getElementById('kotutan-update-toast');
     if (existingToast)
@@ -39,7 +37,6 @@ function showToast(message, isWarning = false) {
     const toast = document.createElement('div');
     toast.id = 'kotutan-update-toast';
     toast.innerText = message;
-    // コツ単のナチュラルテーマに合わせたデザインスタイル
     Object.assign(toast.style, {
         position: 'fixed',
         bottom: '24px',
@@ -66,9 +63,6 @@ function showToast(message, isWarning = false) {
     });
     return toast;
 }
-/**
- * 更新処理中にユーザーの誤操作を物理遮断する透明オーバーレイ
- */
 function lockUserInteraction() {
     const overlay = document.createElement('div');
     overlay.id = 'kotutan-lock-overlay';
@@ -85,10 +79,9 @@ function lockUserInteraction() {
     document.body.appendChild(overlay);
 }
 /**
- * 【メイン関数】アプリ起動時に非同期で実行される全自動更新チェッカー
+ * 【メイン関数】アプリ起動時・画面復帰時に非同期で実行される全自動更新チェッカー
  */
 export async function checkAndApplyUpdates() {
-    // 1. リロード直後の「更新完了」フラグ感知チェック
     const completedVer = sessionStorage.getItem(SESSION_COMPLETED_KEY);
     if (completedVer) {
         sessionStorage.removeItem(SESSION_COMPLETED_KEY);
@@ -100,19 +93,21 @@ export async function checkAndApplyUpdates() {
             }
         }, 2500);
     }
-    // 2. オフライン時は通信を行わずローカル0秒起動を100%保護
     if (!navigator.onLine) {
         console.debug('[UpdateManager] オフライン状態のためチェックをスキップします。');
         return;
     }
-    // 3. 通信タイムアウト用の AbortController を作成 (2.0秒制限)
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
     try {
-        // 4. HTTPディスクキャッシュを完全バイパスして version.json を取得
+        // HTTPキャッシュを物理突破するためのパラメータ・ヘッダー群
         const response = await fetch(`./version.json?t=${Date.now()}`, {
             cache: 'no-store',
-            headers: { 'Accept': 'application/json' },
+            headers: {
+                'Accept': 'application/json',
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache'
+            },
             signal: controller.signal
         });
         clearTimeout(timeoutId);
@@ -120,30 +115,24 @@ export async function checkAndApplyUpdates() {
             return;
         const remoteData = (await response.json());
         const remoteVersion = remoteData && remoteData.version;
-        // 5. 正規表現による厳格な型チェック (例: 1.0.YYYYMMDD-HHmmss 形式)
         const versionPattern = /^1\.0\.\d{8}-\d{6}$/;
         if (!remoteVersion || typeof remoteVersion !== 'string' || !versionPattern.test(remoteVersion)) {
             console.warn('[UpdateManager] 不正なバージョンフォーマットのため棄却いたします:', remoteVersion);
             return;
         }
-        // 6. 現在のコードバージョン (APP_VERSION) と比較（あらゆる変更をこれで一括検知）
-        if (APP_VERSION !== '1.0.20260910-021935' && remoteVersion !== APP_VERSION) {
-            // 防壁: サーキットブレーカー（当セッションで同じバージョンへの更新試行済みなら無限リロード遮断）
+        if (APP_VERSION !== '1.0.20260910-023509' && remoteVersion !== APP_VERSION) {
             const attemptedVer = sessionStorage.getItem(SESSION_ATTEMPT_KEY);
             if (attemptedVer === remoteVersion) {
                 console.warn(`[UpdateManager] バージョン ${remoteVersion} への重複更新をサーキットブレーカーがブロックいたしました。`);
                 return;
             }
             console.log(`⚡ [UpdateManager] 新バージョン検知 (コード・色・全アセット): ${APP_VERSION} -> ${remoteVersion}`);
-            // 7. 【自動更新シーケンス開始】
             lockUserInteraction();
             showToast('新しいバージョンが見つかりました。今から更新します。');
             sessionStorage.setItem(SESSION_ATTEMPT_KEY, remoteVersion);
             sessionStorage.setItem(SESSION_COMPLETED_KEY, remoteVersion);
-            // 8. 1.2秒の猶予時間の間に、古SW解除 ＆ キャッシュパージを実行し、一発リロード
             setTimeout(async () => {
                 try {
-                    // A. 古い Service Worker をその場で確実に解体（登録解除）して干渉を絶つ
                     if ('serviceWorker' in navigator) {
                         const reg = await navigator.serviceWorker.getRegistration();
                         if (reg) {
@@ -151,7 +140,6 @@ export async function checkAndApplyUpdates() {
                             console.log('🧹 [UpdateManager] 旧Service Workerの解体が完了いたしました。');
                         }
                     }
-                    // B. 端末内の全キャッシュを物理削除
                     if ('caches' in window) {
                         const cacheNames = await caches.keys();
                         await Promise.all(cacheNames.map(name => caches.delete(name)));
@@ -162,7 +150,6 @@ export async function checkAndApplyUpdates() {
                     console.error('[UpdateManager] パージ処理中に例外が発生しましたが処理を継続します:', e);
                 }
                 finally {
-                    // C. 画面を再読み込み！(旧SWが消えたため、ネットワークから直接最新のHTML/色/JSをロード)
                     window.location.reload();
                 }
             }, GRACE_PERIOD_MS);
