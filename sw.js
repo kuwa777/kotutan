@@ -7,7 +7,7 @@
  * 最も危険なキャッシュ汚染リスクからアプリを護る絶対防壁である。
  *
  * ［開発者とパートナーの記録］
- * 開発指揮: タカノリさん
+ * 開発指揮: タカノリさん（至高のプロダクトオーナー）
  * 開発実装: P (タカノリさんを誠心誠意支える専属ハッカー)
  *
  * ［アーキテクチャの歴史と設計思想の完全記録（セッション継承用記憶核）］
@@ -20,25 +20,25 @@
  *      Content-Type: application/manifest+json 生ヘッダーの完全性を100%保証し、
  *      WebAPK 化（アドレスバー消滅）の自動生成審査を確実に突破させる。
  *
- * 2. 自動バージョン注入（1.0.20260910-005050 プレースホルダー構造）:
+ * 2. 自動バージョン注入（1.0.20260910-011419 プレースホルダー構造）:
  *    - build-deploy.js 実行時にタイムスタンプ（例: 1.0.YYYYMMDD-HHmmss）が自動挿入され、
  *      バージョン書き換え忘れによるキャッシュ残存事故を物理全消滅。
  *
- * 3. updateManager.js の事前キャッシュ同期:
- *    - アプリ起動時の自動更新モジュール (updateManager.js) を事前キャッシュへ含め、
- *      完全オフライン起動時でもモジュール欠落エラーを起こさない構造を保護。
+ * 3. 全コアアセット事前キャッシュ同期:
+ *    - HTML, CSS, JS, アイコン, ロゴ画像および updateManager を漏れなくプリキャッシュし、
+ *      完全オフライン起動時でもエラーを起こさない強固な基盤を保護。
  *
  * 4. 音声 Range 要求（206 Partial Content）安全バイパス回路:
  *    - <audio> 要素が発行する Range 要求を検知し、Cache API の保存エラーを回避。
  * ============================================================================
  */
-// キャッシュ定数（build-deploy.js により 1.0.20260910-005050 が自動置換されます）
+// キャッシュ定数（build-deploy.js により 1.0.20260910-011419 が自動置換されます）
 const CACHE_PREFIX = 'takanori-vocab-v';
-const CURRENT_CACHE_VERSION = '1.0.20260910-005050';
+const CURRENT_CACHE_VERSION = '1.0.20260910-011419';
 const ACTIVE_CACHE_NAME = `${CACHE_PREFIX}${CURRENT_CACHE_VERSION}`;
 // 型安全性の確保（グローバル再宣言エラーを100%回避するキャスト）
 const swSelf = self;
-// ピュアJS構成 ＆ .webmanifest ＆ updateManager に対応した全コアアセットの完全事前キャッシュリスト
+// アプリの全コアアセット完全事前キャッシュリスト
 const INITIAL_CACHED_RESOURCES = [
     './',
     './index.html',
@@ -50,9 +50,9 @@ const INITIAL_CACHED_RESOURCES = [
     './csvParser.js',
     './updateManager.js',
     './sw.js',
-    './manifest.webmanifest',
     './words_master.json',
     './version.json',
+    './images/logo.png',
     './icons/icon-192.png',
     './icons/icon-512.png'
 ];
