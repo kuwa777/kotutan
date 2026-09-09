@@ -91,8 +91,8 @@ class TakanoriVocabApp {
         this.loadAutoPlaySpeed();
         this.loadSavedStateAndFilters();
         this.attachEventListeners();
-        // 2. 最低 1000ms（1秒）のブランディング演出タイマー
-        const minAnimationPromise = new Promise(resolve => setTimeout(resolve, 1000));
+        // 2. 最低 2000ms（2秒）のブランディング演出タイマー
+        const minAnimationPromise = new Promise(resolve => setTimeout(resolve, 2000));
         try {
             await this.dbService.initialize();
             const currentVersionHash = await this.checkAndSyncVersion();
@@ -116,7 +116,7 @@ class TakanoriVocabApp {
                 }
             });
             const maxWaitPromise = new Promise(resolve => setTimeout(resolve, 60000));
-            // 最低1秒タイマーを確実に待ち、かつ初回同期の完了（100%）または 60秒タイムアウトまで待機
+            // 最低2秒タイマーを確実に待ち、かつ初回同期の完了（100%）または 60秒タイムアウトまで待機
             await minAnimationPromise;
             await Promise.race([syncPromise, maxWaitPromise]);
             this.registerServiceWorker();
