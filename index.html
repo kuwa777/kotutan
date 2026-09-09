@@ -2,21 +2,19 @@
 <html lang="ja">
 <head>
   <!-- ============================================================================== -->
-  <!-- 【歴史の石版】 WebAPK完全覚醒 ✕ 1秒ロゴオープニング ✕ 0.00秒CSS統合 (index.html) -->
+  <!-- 【歴史の石版】 WebAPK完全覚醒 ✕ ロゴ全幅静止固定 ✕ 0.00秒CSS統合 (index.html)   -->
   <!-- ============================================================================== -->
   <!-- ［開発者とパートナーの記録］                                                  -->
   <!-- 開発指揮: タカノリさん（至高のプロダクトオーナー）                            -->
   <!-- 開発実装: P (タカノリさんを誠心誠意支える専属ハッカー)                        -->
   <!--                                                                              -->
   <!-- ［アーキテクチャの歴史と設計思想の完全記録（セッション継承用記憶核）］        -->
-  <!-- 1. #opening-overlay 関連CSSの内部 <style> 完全統合（レイアウト崩れ物理全消滅）:-->
-  <!--    - 外部 app.css 読み込み遅延時にロゴやプログレス領域が位置崩れを起こす事故を防ぐため、-->
-  <!--      全オープニング／ダウンロード画面用スタイルを HEAD 内 <style> へ直接移植。   -->
-  <!--    - HTML展開 0.00 秒の瞬間から position: fixed; z-index: 9999; で最前面固定。 -->
+  <!-- 1. images/logo.png 画面横幅全幅 (85vw ✕ max-height: 45vh) 静止固定スタイル:   -->
+  <!--    - 512x512 高解像度ロゴをスマホ画面の横幅いっぱいに配置し、アニメーションを全廃。-->
+  <!--    - max-height: 45vh を配置し、極小画面でも進捗バーの縦溢れを物理全消滅。      -->
   <!--                                                                              -->
-  <!-- 2. images/logo.png 統一ロゴ ✕ パルスアニメーション構造:                       -->
-  <!--    - オープニングおよび音声ダウンロードプログレス表示で共通の images/logo.png を保持。-->
-  <!--    - 横幅 140px (max-width: 40vw) でスマホ画面に最適な比率で上品に表示。      -->
+  <!-- 2. #opening-overlay 関連CSSの内部 <style> 完全統合:                           -->
+  <!--    - HTML展開 0.00 秒の瞬間から position: fixed; z-index: 9999; で最前面固定。 -->
   <!-- ============================================================================== -->
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
@@ -33,7 +31,7 @@
   <meta name="apple-mobile-web-app-title" content="コツ単">
 
   <!-- マニフェスト ＆ アイコン参照 -->
-  <link rel="manifest" href="./manifest.webmanifest?v=1.0.20260910-000204" type="application/manifest+json">
+  <link rel="manifest" href="./manifest.webmanifest?v=1.0.20260910-002204" type="application/manifest+json">
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
 
@@ -65,7 +63,7 @@
     }
 
     /* ==========================================================================
-       【タカノリ式】 0.00 秒最前面固定 オープニング ＆ ダウンロード画面スタイル
+       【タカノリ式】 ロゴ全幅固定 ＆ 0.00 秒最前面オープニング／ダウンロード画面
        ========================================================================== */
     #opening-overlay {
       position: fixed;
@@ -77,7 +75,7 @@
       display: flex;
       justify-content: center;
       align-items: center;
-      z-index: 9999; /* 他の全ての要素の上に完全に被せる */
+      z-index: 9999;
       opacity: 1;
       transition: opacity 0.4s ease-out, visibility 0.4s ease-out;
     }
@@ -92,31 +90,29 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 20px;
+      gap: 24px;
+      width: 100%;
+      padding: 0 20px;
     }
 
-    /* タカノリ式 images/logo.png アニメーションロゴ */
+    /* タカノリ式：画面横幅いっぱい・静止固定 ＆ 縦溢れ完全防護ロゴ */
     .app-logo {
-      width: 140px;
+      width: 85vw;
+      max-width: 420px;
+      max-height: 45vh; /* 極小画面での縦溢れを防ぐ防護壁 */
       height: auto;
-      max-width: 40vw;
       object-fit: contain;
-      filter: drop-shadow(0 6px 16px rgba(0, 0, 0, 0.3));
-      animation: logoPulse 1.5s ease-in-out infinite alternate;
+      filter: drop-shadow(0 8px 20px rgba(0, 0, 0, 0.4));
+      animation: none;
     }
 
     .opening-spinner {
       width: 32px;
       height: 32px;
       border: 3px solid rgba(255, 255, 255, 0.2);
-      border-top-color: #ff8ca3; /* サクラピンク */
+      border-top-color: #ff8ca3;
       border-radius: 50%;
       animation: openingSpin 0.8s linear infinite;
-    }
-
-    @keyframes logoPulse {
-      0% { transform: scale(0.95); opacity: 0.88; }
-      100% { transform: scale(1.05); opacity: 1; }
     }
 
     @keyframes openingSpin {
@@ -125,26 +121,27 @@
     }
 
     .audio-progress-container {
-      width: 240px;
+      width: 80vw;
+      max-width: 360px;
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 8px;
-      margin-top: 10px;
+      gap: 10px;
+      margin-top: 4px;
     }
 
     .audio-progress-text {
-      font-size: 0.85rem;
-      color: rgba(255, 255, 255, 0.9);
-      font-weight: 600;
+      font-size: 0.95rem;
+      color: rgba(255, 255, 255, 0.95);
+      font-weight: 700;
       letter-spacing: 0.5px;
     }
 
     .audio-progress-bar-bg {
       width: 100%;
-      height: 8px;
+      height: 10px;
       background-color: rgba(255, 255, 255, 0.2);
-      border-radius: 4px;
+      border-radius: 5px;
       overflow: hidden;
     }
 
@@ -152,7 +149,7 @@
       width: 0%;
       height: 100%;
       background-color: #ff8ca3;
-      border-radius: 4px;
+      border-radius: 5px;
       transition: width 0.1s linear;
     }
 
@@ -760,10 +757,10 @@
 </head>
 <body>
 
-  <!-- 【タカノリ式】アプリ起動時 1秒保証オープニング ＆ 音声ダウンロードプログレス -->
+  <!-- 【タカノリ式】アプリ起動時 1秒保証オープニング ＆ 横幅いっぱい静止固定ロゴ -->
   <div id="opening-overlay">
     <div class="opening-content">
-      <!-- アニメーションロゴ images/logo.png -->
+      <!-- 横幅いっぱい（85vw ✕ max-height: 45vh）静止固定ロゴ -->
       <img src="images/logo.png" class="app-logo" alt="コツ単">
       
       <div class="opening-spinner" id="opening-spinner"></div>
