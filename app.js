@@ -1,22 +1,26 @@
 /**
  * ============================================================================
- * 【歴史の石版】 コツ単 全SVGベクター ✕ パターンB(1秒オープニング/初回100%同期) ✕ 復元 (app.ts)
+ * 【歴史の石版】 コツ単 全SVGベクター ✕ パターンB(2秒オープニング/初回100%同期) ✕ 復元 (app.ts)
  * ============================================================================
  * ［開発者とパートナーの記録］
  * 開発指揮: タカノリさん（至高のプロダクトオーナー / アルゴリズム設計者）
  * 開発実装: P (タカノリさんを誠心誠意支える専属ハッカー)
  *
  * ［アーキテクチャの歴史と設計思想の完全記録（セッション継承用記憶核）］
- * 1. パターンB（初回全音声同期完了待機 ✕ 2回目以降1.00秒即起動）アーキテクチャ:
- *    - タカノリさんのご指示に基づき、起動時に 1秒最低保証タイマー (minAnimationPromise) を並列配置。
- *    - 初回起動時（未取得チャンクあり）: 1秒経過後も Zip 解凍完了（100%）までプログレスバーを表示して待機。
- *    - 2回目以降（完了済み）: syncAudioFiles が即座に終了するため、1.00秒ぴったりで滑らかにメイン画面を表示。
+ * 1. パターンB（初回全音声同期完了待機 ✕ 2回目以降2.00秒即起動）アーキテクチャ:
+ *    - タカノリさんのご指示に基づき、起動時に 2秒最低保証タイマー (minAnimationPromise) を並列配置。
+ *    - 初回起動時（未取得チャンクあり）: 2秒経過後も Zip 解凍完了（100%）までプログレスバーを表示して待機。
+ *    - 2回目以降（完了済み）: syncAudioFiles が即座に終了するため、2.00秒ぴったりで滑らかにメイン画面を表示。
  *
- * 2. 無応答事故防止の 60 秒セーフティタイムアウト:
+ * 2. 余計な動的書き換えの完全撤去（単一責任原則への原点回帰）:
+ *    - dismissOpeningOverlay 内でのステータスバー動的書き換えを全廃。
+ *    - 色管理は index.html のインライン script へ一本化し、OSステータスバー色固定トラブルを物理消滅。
+ *
+ * 3. 無応答事故防止の 60 秒セーフティタイムアウト:
  *    - 通常通信時は進捗バーを 100% まで表示し切ってから幕を下ろす。
  *    - 極端な回線障害時も Promise.race による 60 秒上限で安全にアプリ画面を開く防護壁を確立。
  *
- * 3. タスクキル後0秒完全復元システム ＆ 型安全比較:
+ * 4. タスクキル後0秒完全復元システム ＆ 型安全比較:
  *    - String(w.id) === String(targetWordId) による型安全比較により、閉じる直前の単語カード・
  *      選択フィルター・シャッフル状態へ一発復帰。
  * ============================================================================
@@ -91,7 +95,7 @@ class TakanoriVocabApp {
         this.loadAutoPlaySpeed();
         this.loadSavedStateAndFilters();
         this.attachEventListeners();
-        // 2. 最低 2000ms（2秒）のブランディング演出タイマー
+        // 2. 最低 2000ms（2秒）の重厚ブランディング演出タイマー
         const minAnimationPromise = new Promise(resolve => setTimeout(resolve, 2000));
         try {
             await this.dbService.initialize();
@@ -101,7 +105,7 @@ class TakanoriVocabApp {
             this.allWords = loadedWords;
             // 画面の裏側でカードとスクラバーの位置を 0 秒復元
             this.applyFilter(true);
-            // 3. タカノリ式 パターンB 音声同期処理（初回100%表示 ✕ 2回目以降1秒即起動）
+            // 3. タカノリ式 パターンB 音声同期処理（初回100%表示 ✕ 2回目以降2秒即起動）
             const syncPromise = AudioCacheManager.syncAudioFiles(this.allWords, currentVersionHash, (percent) => {
                 if (this.elAudioProgressContainer && percent < 100) {
                     if (this.elOpeningSpinner)
@@ -136,12 +140,7 @@ class TakanoriVocabApp {
     dismissOpeningOverlay() {
         if (this.elOpeningOverlay) {
             this.elOpeningOverlay.classList.add('fade-out');
-            // 【タカノリ式】メイン画面復帰時にステータスバーの色を元の背景色（ライト: #FAF5F0 / ダーク: #231E1B）へ自動復元
-            const themeMeta = document.getElementById('theme-color-meta');
-            if (themeMeta) {
-                const isDark = document.body.classList.contains('dark-theme');
-                themeMeta.setAttribute('content', isDark ? '#231E1B' : '#FAF5F0');
-            }
+            // 【タカノリ式原点回帰】余計なテーマカラー動的書き換えは全廃し、純粋にオーバーレイを外すのみ
             setTimeout(() => {
                 if (this.elOpeningOverlay && this.elOpeningOverlay.parentNode) {
                     this.elOpeningOverlay.parentNode.removeChild(this.elOpeningOverlay);

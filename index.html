@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <!-- ============================================================================== -->
-  <!-- 【歴史の石版】 WebAPK完全覚醒 ✕ ロゴ全幅静止固定 ✕ 0.00秒CSS統合 (index.html)   -->
+  <!-- 【歴史の石版】 WebAPK完全覚醒 ✕ 原点回帰シンプルステータスバー (index.html)     -->
   <!-- ============================================================================== -->
   <!-- ［開発者とパートナーの記録］                                                  -->
   <!-- 開発指揮: タカノリさん（至高のプロダクトオーナー）                            -->
@@ -11,10 +11,12 @@
   <!-- ［アーキテクチャの歴史と設計思想の完全記録（セッション継承用記憶核）］        -->
   <!-- 1. images/logo.png 画面横幅全幅 (85vw ✕ max-height: 45vh) 静止固定スタイル:   -->
   <!--    - 512x512 高解像度ロゴをスマホ画面の横幅いっぱいに配置し、アニメーションを全廃。-->
-  <!--    - max-height: 45vh を配置し、極小画面でも進捗バーの縦溢れを物理全消滅。      -->
+  <!--    - max-height: 45vh を配置し、極小画面での縦溢れを物理全消滅。                -->
   <!--                                                                              -->
-  <!-- 2. #opening-overlay 関連CSSの内部 <style> 完全統合:                           -->
-  <!--    - HTML展開 0.00 秒の瞬間から position: fixed; z-index: 9999; で最前面固定。 -->
+  <!-- 2. シンプル・ステータスバー ＆ テーマ 0.00 秒即時同期設計:                    -->
+  <!--    - 起動画面での複雑なJS動的書き換えを全廃し、基本テーマを #FAF5F0 に固定。     -->
+  <!--    - インライン script で保存テーマ(kotutan_theme)を判定し、ライト(#FAF5F0) /  -->
+  <!--      ダーク(#231E1B) のステータスバー色を 0.00 秒の瞬間から完璧に同化させる。  -->
   <!-- ============================================================================== -->
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
@@ -23,15 +25,15 @@
   
   <title>コツ単</title>
 
-  <!-- PWA ネイティブ表示 ＆ メタデータ定義 -->
-  <meta name="theme-color" content="#4a3b32" id="theme-color-meta">
+  <!-- PWA ネイティブ表示 ＆ メタデータ定義 (初期値はメイン画面のアイボリー) -->
+  <meta name="theme-color" content="#FAF5F0" id="theme-color-meta">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="コツ単">
 
   <!-- マニフェスト ＆ アイコン参照 -->
-  <link rel="manifest" href="./manifest.webmanifest?v=1.0.20260910-011419" type="application/manifest+json">
+  <link rel="manifest" href="./manifest.webmanifest?v=1.0.20260910-020301" type="application/manifest+json">
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
 
@@ -757,7 +759,7 @@
 </head>
 <body>
 
-  <!-- 【タカノリ式】アプリ起動時 1秒保証オープニング ＆ 横幅いっぱい静止固定ロゴ -->
+  <!-- 【タカノリ式】アプリ起動時 2秒保証オープニング ＆ 横幅いっぱい静止固定ロゴ -->
   <div id="opening-overlay">
     <div class="opening-content">
       <!-- 横幅いっぱい（85vw ✕ max-height: 45vh）静止固定ロゴ -->
@@ -868,6 +870,21 @@
   </div>
 
   <script>
+    /**
+     * ============================================================================
+     * 【歴史の石版】 シンプル・ステータスバー ＆ テーマ 0.00 秒即時同期層 (index.html)
+     * ============================================================================
+     * ［開発者とパートナーの記録］
+     * 開発指揮: タカノリさん（至高のプロダクトオーナー）
+     * 開発実装: P (タカノリさんを誠心誠意支える専属ハッカー)
+     * 
+     * ［アーキテクチャの歴史と設計思想の完全記録（セッション継承用記憶核）］
+     * 1. JS動的書き換えの過剰装飾を全廃した原点回帰設計:
+     *    - 起動画面での複雑なステータスバー色変更を全撤去し、基本テーマを #FAF5F0 に固定。
+     *    - 起動時および切り替えボタン押下時に、<meta name="theme-color"> の content 属性を
+     *      書き換えるだけで、ライト(#FAF5F0) / ダーク(#231E1B) のステータスバー色を完全同化。
+     * ============================================================================
+     */
     (function() {
       const themeBtn = document.getElementById('btn-theme-toggle');
       const themeMeta = document.getElementById('theme-color-meta');
@@ -875,13 +892,17 @@
       const ICON_SUN = `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>`;
       const ICON_MOON = `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>`;
 
+      // 1. 保存されたテーマを読み込み、0.00 秒でステータスバーを完全同期
       const savedTheme = localStorage.getItem('kotutan_theme');
       if (savedTheme === 'dark') {
         document.body.classList.add('dark-theme');
         if (themeBtn) themeBtn.innerHTML = ICON_MOON;
         if (themeMeta) themeMeta.setAttribute('content', '#231E1B');
+      } else {
+        if (themeMeta) themeMeta.setAttribute('content', '#FAF5F0');
       }
 
+      // 2. テーマ切り替えボタンのクリック時処理
       if (themeBtn) {
         themeBtn.addEventListener('click', function() {
           const isDark = document.body.classList.toggle('dark-theme');
