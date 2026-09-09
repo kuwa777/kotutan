@@ -1,4 +1,3 @@
-"use strict";
 /**
  * ============================================================================
  * 【歴史の石版】 コツ単 完全自動更新 ＆ 絶対安全キャッシュパージ制御層 (updateManager.ts)
@@ -13,7 +12,7 @@
  * ［アーキテクチャの歴史と設計思想の完全記録（セッション継承用記憶核）］
  * 1. TS直接保持バージョン（APP_VERSION）対話比較構造:
  *    - localStorage の不確定要素（空・削除リスク）を完全排除。
- *    - build-deploy.js により 1.0.20260909-222228 プレースホルダーへタイムスタンプが自動注入され、
+ *    - build-deploy.js により 1.0.20260909-223529 プレースホルダーへタイムスタンプが自動注入され、
  *      現在実行中の TS/JS 自身が持っているバージョンと、サーバーの version.json を直接比較。
  *
  * 2. 5重の絶対防壁（Z-Level Defense System）:
@@ -24,11 +23,8 @@
  *    - 防壁⑤: リロード後自動感知トースト（事後通知によるUX安心感の完全提供）
  * ============================================================================
  */
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.APP_VERSION = void 0;
-exports.checkAndApplyUpdates = checkAndApplyUpdates;
 // ビルド時に build-deploy.js によってタイムスタンプ（例: 1.0.YYYYMMDD-HHmmss）が注入されます
-exports.APP_VERSION = '1.0.20260909-222228';
+export const APP_VERSION = '1.0.20260909-223529';
 const TIMEOUT_MS = 2000; // サーバー通信の厳格タイムアウト（2秒）
 const GRACE_PERIOD_MS = 1200; // 更新前トースト表示 ＆ キャッシュ破棄の猶予時間（1.2秒）
 const SESSION_ATTEMPT_KEY = 'kotutan_update_attempted_ver';
@@ -92,7 +88,7 @@ function lockUserInteraction() {
 /**
  * 【メイン関数】アプリ起動時に非同期で実行される自動更新チェッカー
  */
-async function checkAndApplyUpdates() {
+export async function checkAndApplyUpdates() {
     // 1. リロード直後の「更新完了」フラグ感知チェック
     const completedVer = sessionStorage.getItem(SESSION_COMPLETED_KEY);
     if (completedVer) {
@@ -132,14 +128,14 @@ async function checkAndApplyUpdates() {
             return;
         }
         // 6. 現在のコードバージョン (APP_VERSION) と比較
-        if (exports.APP_VERSION !== '1.0.20260909-222228' && remoteVersion !== exports.APP_VERSION) {
+        if (APP_VERSION !== '1.0.20260909-223529' && remoteVersion !== APP_VERSION) {
             // 防壁: サーキットブレーカー（当セッションで同じバージョンへの更新試行済みなら無限リロード遮断）
             const attemptedVer = sessionStorage.getItem(SESSION_ATTEMPT_KEY);
             if (attemptedVer === remoteVersion) {
                 console.warn(`[UpdateManager] バージョン ${remoteVersion} への重複更新をサーキットブレーカーがブロックいたしました。`);
                 return;
             }
-            console.log(`⚡ [UpdateManager] 新バージョン検知: ${exports.APP_VERSION} -> ${remoteVersion}`);
+            console.log(`⚡ [UpdateManager] 新バージョン検知: ${APP_VERSION} -> ${remoteVersion}`);
             // 7. 【自動更新シーケンス開始】
             // A. 画面操作を透明オーバーレイで100%ロック
             lockUserInteraction();
@@ -173,7 +169,7 @@ async function checkAndApplyUpdates() {
             }, GRACE_PERIOD_MS);
         }
         else {
-            console.debug(`[UpdateManager] アプリは最新状態です (v${exports.APP_VERSION})`);
+            console.debug(`[UpdateManager] アプリは最新状態です (v${APP_VERSION})`);
         }
     }
     catch (error) {

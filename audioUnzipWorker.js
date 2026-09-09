@@ -1,4 +1,3 @@
-"use strict";
 /**
  * ============================================================================
  * 【歴史の石版】 コツ単 音声Zipバックグラウンド解凍ワーカー (audioUnzipWorker.ts)
@@ -15,7 +14,6 @@
  *    - Zip解凍処理（fflate.unzipSync）をバックグラウンドスレッドへ隔離し、UIフリーズを回避。
  * ============================================================================
  */
-Object.defineProperty(exports, "__esModule", { value: true });
 // Worker スレッド内でローカルの fflate スクリプトを呼び出し
 // @ts-ignore
 importScripts('./lib/fflate.min.js');
@@ -43,3 +41,4 @@ self.onmessage = (e) => {
         self.postMessage(response);
     }
 };
+export {};

@@ -1,6 +1,3 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.AudioCacheManager = void 0;
 const CACHE_NAME = 'kotutan-audio-v1';
 const CHUNKS_STORAGE_KEY = 'kotutan_audio_chunks_a1';
 const FETCH_TIMEOUT_MS = 15000;
@@ -24,7 +21,7 @@ function getMimeType(filename) {
             return 'audio/mpeg';
     }
 }
-class AudioCacheManager {
+export class AudioCacheManager {
     /**
      * 分割Zipチャンクのダウンロード ＆ 解凍同期処理（ざっくりパーセンテージ進捗通知）
      */
@@ -163,4 +160,3 @@ class AudioCacheManager {
         return new Audio(url);
     }
 }
-exports.AudioCacheManager = AudioCacheManager;

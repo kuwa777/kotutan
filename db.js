@@ -1,4 +1,3 @@
-"use strict";
 /**
  * ============================================================================
  * 【歴史の石版】 二層分離 ✕ 二重物理ストレージ(IndexedDB + localStorage) 制御層 (db.ts)
@@ -19,31 +18,29 @@
  *    - tx.oncomplete 待機と localStorage 同期により、タスクキル時のデータ消失を物理全消滅。
  * ============================================================================
  */
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.DatabaseService = void 0;
-const constants_js_1 = require("./constants.js");
+import { DB_NAME, DB_VERSION, STORE_WORDS_A, STORE_WORDS_B, STORE_META, LOCK_NAME_DB_SWAP, } from './constants.js';
 const STORE_USER_DATA = 'user_personal_data';
 const LOCALSTORAGE_BACKUP_KEY = 'kotutan_user_states_backup';
-class DatabaseService {
+export class DatabaseService {
     db = null;
     async initialize() {
         if (this.db)
             return;
         return new Promise((resolve, reject) => {
-            const request = indexedDB.open(constants_js_1.DB_NAME, constants_js_1.DB_VERSION);
+            const request = indexedDB.open(DB_NAME, DB_VERSION);
             request.onupgradeneeded = (event) => {
                 const db = request.result;
-                if (!db.objectStoreNames.contains(constants_js_1.STORE_WORDS_A)) {
-                    db.createObjectStore(constants_js_1.STORE_WORDS_A, { keyPath: 'id' });
+                if (!db.objectStoreNames.contains(STORE_WORDS_A)) {
+                    db.createObjectStore(STORE_WORDS_A, { keyPath: 'id' });
                 }
-                if (!db.objectStoreNames.contains(constants_js_1.STORE_WORDS_B)) {
-                    db.createObjectStore(constants_js_1.STORE_WORDS_B, { keyPath: 'id' });
+                if (!db.objectStoreNames.contains(STORE_WORDS_B)) {
+                    db.createObjectStore(STORE_WORDS_B, { keyPath: 'id' });
                 }
                 if (!db.objectStoreNames.contains(STORE_USER_DATA)) {
                     db.createObjectStore(STORE_USER_DATA, { keyPath: 'wordId' });
                 }
-                if (!db.objectStoreNames.contains(constants_js_1.STORE_META)) {
-                    db.createObjectStore(constants_js_1.STORE_META, { keyPath: 'id' });
+                if (!db.objectStoreNames.contains(STORE_META)) {
+                    db.createObjectStore(STORE_META, { keyPath: 'id' });
                 }
             };
             request.onsuccess = () => {
@@ -82,8 +79,8 @@ class DatabaseService {
     async getAppMeta() {
         const db = this.getDb();
         return new Promise((resolve, reject) => {
-            const tx = db.transaction(constants_js_1.STORE_META, 'readonly');
-            const store = tx.objectStore(constants_js_1.STORE_META);
+            const tx = db.transaction(STORE_META, 'readonly');
+            const store = tx.objectStore(STORE_META);
             const request = store.get('system_meta');
             request.onsuccess = () => resolve(request.result || null);
             request.onerror = () => reject(request.error);
@@ -92,8 +89,8 @@ class DatabaseService {
     async saveAppMeta(meta) {
         const db = this.getDb();
         return new Promise((resolve, reject) => {
-            const tx = db.transaction(constants_js_1.STORE_META, 'readwrite');
-            const store = tx.objectStore(constants_js_1.STORE_META);
+            const tx = db.transaction(STORE_META, 'readwrite');
+            const store = tx.objectStore(STORE_META);
             const request = store.put(meta);
             tx.oncomplete = () => resolve();
             tx.onerror = () => reject(request.error);
@@ -101,11 +98,11 @@ class DatabaseService {
     }
     async getActiveStoreName() {
         const meta = await this.getAppMeta();
-        return meta?.activeStore === 'B' ? constants_js_1.STORE_WORDS_B : constants_js_1.STORE_WORDS_A;
+        return meta?.activeStore === 'B' ? STORE_WORDS_B : STORE_WORDS_A;
     }
     async getInactiveStoreName() {
         const meta = await this.getAppMeta();
-        return meta?.activeStore === 'B' ? constants_js_1.STORE_WORDS_A : constants_js_1.STORE_WORDS_B;
+        return meta?.activeStore === 'B' ? STORE_WORDS_A : STORE_WORDS_B;
     }
     /**
      * 二重ストレージ同期・自動リストア付き 全単語取得関数
@@ -229,11 +226,10 @@ class DatabaseService {
             });
         };
         if ('locks' in navigator) {
-            return navigator.locks.request(constants_js_1.LOCK_NAME_DB_SWAP, execute);
+            return navigator.locks.request(LOCK_NAME_DB_SWAP, execute);
         }
         else {
             await execute();
         }
     }
 }
-exports.DatabaseService = DatabaseService;

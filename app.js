@@ -1,5 +1,3 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
 /**
  * ============================================================================
  * 【歴史の石版】 コツ単 全SVGベクター ✕ オープニング1秒 ✕ 完全同期 ✕ 復元 (app.ts)
@@ -22,9 +20,9 @@ Object.defineProperty(exports, "__esModule", { value: true });
  *      選択フィルター・シャッフル状態へ一発復帰。
  * ============================================================================
  */
-const updateManager_js_1 = require("./updateManager.js");
-const db_js_1 = require("./db.js");
-const audioCacheManager_js_1 = require("./audioCacheManager.js");
+import { checkAndApplyUpdates } from './updateManager.js';
+import { DatabaseService } from './db.js';
+import { AudioCacheManager } from './audioCacheManager.js';
 // 洗練されたSVGベクターアイコン群の定義
 const ICON_PREV = `<svg class="icon" viewBox="0 0 24 24" fill="currentColor"><polygon points="18 4 4 12 18 20 18 4"></polygon></svg>`;
 const ICON_NEXT = `<svg class="icon" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 4 20 12 6 20 6 4"></polygon></svg>`;
@@ -83,11 +81,11 @@ class TakanoriVocabApp {
     elProgressContainer;
     elProgressFill;
     constructor() {
-        this.dbService = new db_js_1.DatabaseService();
+        this.dbService = new DatabaseService();
     }
     async start() {
         // 1. 背景で安全に自動更新チェックを発動
-        (0, updateManager_js_1.checkAndApplyUpdates)();
+        checkAndApplyUpdates();
         this.bindDomElements();
         this.loadAutoPlaySpeed();
         this.loadSavedStateAndFilters();
@@ -103,7 +101,7 @@ class TakanoriVocabApp {
             // 画面の裏側でカードとスクラバーの位置を 0 秒復元
             this.applyFilter(true);
             // 3. タカノリ式 シンプル% 音声同期処理（60秒絶対無応答事故防止セーフティ付き）
-            const syncPromise = audioCacheManager_js_1.AudioCacheManager.syncAudioFiles(this.allWords, currentVersionHash, (percent) => {
+            const syncPromise = AudioCacheManager.syncAudioFiles(this.allWords, currentVersionHash, (percent) => {
                 if (this.elAudioProgressContainer && percent < 100) {
                     if (this.elOpeningSpinner)
                         this.elOpeningSpinner.style.display = 'none';
@@ -851,7 +849,7 @@ class TakanoriVocabApp {
         if (!targetFilename)
             return;
         this.stopAudio();
-        const audio = await audioCacheManager_js_1.AudioCacheManager.getAudioElement(targetFilename);
+        const audio = await AudioCacheManager.getAudioElement(targetFilename);
         if (!audio)
             return;
         this.currentAudio = audio;
