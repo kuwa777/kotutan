@@ -2,22 +2,21 @@
 <html lang="ja">
 <head>
   <!-- ============================================================================== -->
-  <!-- 【歴史の石版】 WebAPK完全覚醒 ✕ オープニング最前面固定 ✕ 0.00秒CSS統合 (index.html) -->
+  <!-- 【歴史の石版】 WebAPK完全覚醒 ✕ 1秒ロゴオープニング ✕ 0.00秒CSS統合 (index.html) -->
   <!-- ============================================================================== -->
   <!-- ［開発者とパートナーの記録］                                                  -->
   <!-- 開発指揮: タカノリさん（至高のプロダクトオーナー）                            -->
   <!-- 開発実装: P (タカノリさんを誠心誠意支える専属ハッカー)                        -->
   <!--                                                                              -->
   <!-- ［アーキテクチャの歴史と設計思想の完全記録（セッション継承用記憶核）］        -->
-  <!-- 1. #opening-overlay 関連CSSの内部 <style> 完全統合（タカノリさん不具合指摘）:   -->
-  <!--    - 外部 app.css の読み込み遅延時に #opening-overlay が position: static となり -->
-  <!--      単語ワープバーの上部に「コツ単」ロゴが居座ってレイアウトを下に押し出すバグを撃滅。-->
-  <!--    - 全オープニングスタイルを HEAD 内 <style> へ直接移植し、HTML展開 0.00 秒の瞬間から -->
-  <!--      position: fixed; z-index: 9999; で最前面固定させてレイアウト崩れを 100% 物理全消滅。-->
+  <!-- 1. #opening-overlay 関連CSSの内部 <style> 完全統合（レイアウト崩れ物理全消滅）:-->
+  <!--    - 外部 app.css 読み込み遅延時にロゴやプログレス領域が位置崩れを起こす事故を防ぐため、-->
+  <!--      全オープニング／ダウンロード画面用スタイルを HEAD 内 <style> へ直接移植。   -->
+  <!--    - HTML展開 0.00 秒の瞬間から position: fixed; z-index: 9999; で最前面固定。 -->
   <!--                                                                              -->
-  <!-- 2. 音声 A1/A2 照合プログレス表示領域の完全内包:                                -->
-  <!--    - 初回起動時および差分同期時、#audio-progress-container が動的に出現し、    -->
-  <!--      リアルタイムなダウンロード進捗率（％および完了/全体件数）を安全描画。       -->
+  <!-- 2. images/logo.png 統一ロゴ ✕ パルスアニメーション構造:                       -->
+  <!--    - オープニングおよび音声ダウンロードプログレス表示で共通の images/logo.png を保持。-->
+  <!--    - 横幅 140px (max-width: 40vw) でスマホ画面に最適な比率で上品に表示。      -->
   <!-- ============================================================================== -->
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
@@ -34,7 +33,7 @@
   <meta name="apple-mobile-web-app-title" content="コツ単">
 
   <!-- マニフェスト ＆ アイコン参照 -->
-  <link rel="manifest" href="./manifest.webmanifest?v=1.0.20260909-232133" type="application/manifest+json">
+  <link rel="manifest" href="./manifest.webmanifest?v=1.0.20260910-000204" type="application/manifest+json">
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
 
@@ -66,7 +65,7 @@
     }
 
     /* ==========================================================================
-       【タカノリ式修正】 オープニング画面の 0.00 秒最前面固定スタイル（内部統合）
+       【タカノリ式】 0.00 秒最前面固定 オープニング ＆ ダウンロード画面スタイル
        ========================================================================== */
     #opening-overlay {
       position: fixed;
@@ -96,12 +95,14 @@
       gap: 20px;
     }
 
-    .opening-logo {
-      font-size: 2.2rem;
-      font-weight: 800;
-      color: #ffffff;
-      letter-spacing: 2px;
-      animation: openingPulse 1.2s ease-in-out infinite alternate;
+    /* タカノリ式 images/logo.png アニメーションロゴ */
+    .app-logo {
+      width: 140px;
+      height: auto;
+      max-width: 40vw;
+      object-fit: contain;
+      filter: drop-shadow(0 6px 16px rgba(0, 0, 0, 0.3));
+      animation: logoPulse 1.5s ease-in-out infinite alternate;
     }
 
     .opening-spinner {
@@ -113,9 +114,9 @@
       animation: openingSpin 0.8s linear infinite;
     }
 
-    @keyframes openingPulse {
-      0% { transform: scale(0.96); opacity: 0.85; }
-      100% { transform: scale(1.04); opacity: 1; }
+    @keyframes logoPulse {
+      0% { transform: scale(0.95); opacity: 0.88; }
+      100% { transform: scale(1.05); opacity: 1; }
     }
 
     @keyframes openingSpin {
@@ -759,13 +760,15 @@
 </head>
 <body>
 
-  <!-- 【タカノリ式】アプリ起動時 1秒保証オープニングアニメーション ＆ 音声プログレス -->
+  <!-- 【タカノリ式】アプリ起動時 1秒保証オープニング ＆ 音声ダウンロードプログレス -->
   <div id="opening-overlay">
     <div class="opening-content">
-      <div class="opening-logo">コツ単</div>
+      <!-- アニメーションロゴ images/logo.png -->
+      <img src="images/logo.png" class="app-logo" alt="コツ単">
+      
       <div class="opening-spinner" id="opening-spinner"></div>
       
-      <!-- 音声データ差分ダウンロード用プログレス表示領域 -->
+      <!-- 音声データ差分ダウンロード用プログレス表示領域（初回のみ動的出現） -->
       <div id="audio-progress-container" class="audio-progress-container" style="display: none;">
         <div class="audio-progress-text" id="audio-progress-text">音声データを準備中...</div>
         <div class="audio-progress-bar-bg">

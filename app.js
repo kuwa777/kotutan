@@ -1,15 +1,16 @@
 /**
  * ============================================================================
- * 【歴史の石版】 コツ単 全SVGベクター ✕ オープニング1秒 ✕ 完全同期 ✕ 復元 (app.ts)
+ * 【歴史の石版】 コツ単 全SVGベクター ✕ パターンB(1秒オープニング/初回100%同期) ✕ 復元 (app.ts)
  * ============================================================================
  * ［開発者とパートナーの記録］
  * 開発指揮: タカノリさん（至高のプロダクトオーナー / アルゴリズム設計者）
  * 開発実装: P (タカノリさんを誠心誠意支える専属ハッカー)
  *
  * ［アーキテクチャの歴史と設計思想の完全記録（セッション継承用記憶核）］
- * 1. 1秒最低保証オープニング ✕ パーセンテージ単一プログレス表示:
- *    - タカノリさんのご指示に従い、「音声データを準備中... 43%」と直感的かつシンプルな
- *      パーセンテージ表示のみを採用。100% に到達した時点でダウンロード＆解凍が完了する。
+ * 1. パターンB（初回全音声同期完了待機 ✕ 2回目以降1.00秒即起動）アーキテクチャ:
+ *    - タカノリさんのご指示に基づき、起動時に 1秒最低保証タイマー (minAnimationPromise) を並列配置。
+ *    - 初回起動時（未取得チャンクあり）: 1秒経過後も Zip 解凍完了（100%）までプログレスバーを表示して待機。
+ *    - 2回目以降（完了済み）: syncAudioFiles が即座に終了するため、1.00秒ぴったりで滑らかにメイン画面を表示。
  *
  * 2. 無応答事故防止の 60 秒セーフティタイムアウト:
  *    - 通常通信時は進捗バーを 100% まで表示し切ってから幕を下ろす。
@@ -90,7 +91,7 @@ class TakanoriVocabApp {
         this.loadAutoPlaySpeed();
         this.loadSavedStateAndFilters();
         this.attachEventListeners();
-        // 2. 最低 1000ms の演出タイマー
+        // 2. 最低 1000ms（1秒）のブランディング演出タイマー
         const minAnimationPromise = new Promise(resolve => setTimeout(resolve, 1000));
         try {
             await this.dbService.initialize();
@@ -100,7 +101,7 @@ class TakanoriVocabApp {
             this.allWords = loadedWords;
             // 画面の裏側でカードとスクラバーの位置を 0 秒復元
             this.applyFilter(true);
-            // 3. タカノリ式 シンプル% 音声同期処理（60秒絶対無応答事故防止セーフティ付き）
+            // 3. タカノリ式 パターンB 音声同期処理（初回100%表示 ✕ 2回目以降1秒即起動）
             const syncPromise = AudioCacheManager.syncAudioFiles(this.allWords, currentVersionHash, (percent) => {
                 if (this.elAudioProgressContainer && percent < 100) {
                     if (this.elOpeningSpinner)
@@ -115,8 +116,9 @@ class TakanoriVocabApp {
                 }
             });
             const maxWaitPromise = new Promise(resolve => setTimeout(resolve, 60000));
-            // 最低1秒タイマー ＋ (音声同期 OR 60秒タイムアウト) を待って安全に画面を開く
-            await Promise.all([minAnimationPromise, Promise.race([syncPromise, maxWaitPromise])]);
+            // 最低1秒タイマーを確実に待ち、かつ初回同期の完了（100%）または 60秒タイムアウトまで待機
+            await minAnimationPromise;
+            await Promise.race([syncPromise, maxWaitPromise]);
             this.registerServiceWorker();
         }
         catch (error) {

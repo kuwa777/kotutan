@@ -20,7 +20,7 @@
  *      Content-Type: application/manifest+json 生ヘッダーの完全性を100%保証し、
  *      WebAPK 化（アドレスバー消滅）の自動生成審査を確実に突破させる。
  *
- * 2. 自動バージョン注入（1.0.20260909-232133 プレースホルダー構造）:
+ * 2. 自動バージョン注入（1.0.20260910-000204 プレースホルダー構造）:
  *    - build-deploy.js 実行時にタイムスタンプ（例: 1.0.YYYYMMDD-HHmmss）が自動挿入され、
  *      バージョン書き換え忘れによるキャッシュ残存事故を物理全消滅。
  *
@@ -32,9 +32,9 @@
  *    - <audio> 要素が発行する Range 要求を検知し、Cache API の保存エラーを回避。
  * ============================================================================
  */
-// キャッシュ定数（build-deploy.js により 1.0.20260909-232133 が自動置換されます）
+// キャッシュ定数（build-deploy.js により 1.0.20260910-000204 が自動置換されます）
 const CACHE_PREFIX = 'takanori-vocab-v';
-const CURRENT_CACHE_VERSION = '1.0.20260909-232133';
+const CURRENT_CACHE_VERSION = '1.0.20260910-000204';
 const ACTIVE_CACHE_NAME = `${CACHE_PREFIX}${CURRENT_CACHE_VERSION}`;
 // 型安全性の確保（グローバル再宣言エラーを100%回避するキャスト）
 const swSelf = self;
