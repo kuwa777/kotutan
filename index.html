@@ -33,7 +33,7 @@
   <meta name="apple-mobile-web-app-title" content="コツ単">
 
   <!-- マニフェスト ＆ アイコン参照 -->
-  <link rel="manifest" href="./manifest.webmanifest?v=1.0.20260910-020554" type="application/manifest+json">
+  <link rel="manifest" href="./manifest.webmanifest?v=1.0.20260910-021935" type="application/manifest+json">
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
 
@@ -872,48 +872,62 @@
   <script>
     /**
      * ============================================================================
-     * 【歴史の石版】 シンプル・ステータスバー ＆ テーマ 0.00 秒即時同期層 (index.html)
+     * 【歴史の石版】 ステータスバー完全追従 ✕ メタタグ即時再生成層 (index.html)
      * ============================================================================
      * ［開発者とパートナーの記録］
      * 開発指揮: タカノリさん（至高のプロダクトオーナー）
      * 開発実装: P (タカノリさんを誠心誠意支える専属ハッカー)
      * 
      * ［アーキテクチャの歴史と設計思想の完全記録（セッション継承用記憶核）］
-     * 1. JS動的書き換えの過剰装飾を全廃した原点回帰設計:
-     *    - 起動画面での複雑なステータスバー色変更を全撤去し、基本テーマを #FAF5F0 に固定。
-     *    - 起動時および切り替えボタン押下時に、<meta name="theme-color"> の content 属性を
-     *      書き換えるだけで、ライト(#FAF5F0) / ダーク(#231E1B) のステータスバー色を完全同化。
+     * 1. Android Chrome/WebAPK における theme-color 再描画強制メカニズム:
+     *    - 単なる setAttribute('content', ...) では OS ステータスバーへの色伝播が
+     *      無視されるブラウザ仕様を突破するため、updateThemeColor 関数を新設。
+     *    - 既存の <meta name="theme-color"> を remove() して即座に再 create & appendChild
+     *      することで、ブラウザに強制再描画を行わせ、ダーク(#231E1B) / ライト(#FAF5F0) 
+     *      への切り替え時に上部ステータスバーを 100% 確実に画面と同化させる。
      * ============================================================================
      */
     (function() {
       const themeBtn = document.getElementById('btn-theme-toggle');
-      const themeMeta = document.getElementById('theme-color-meta');
       
       const ICON_SUN = `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>`;
       const ICON_MOON = `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>`;
 
-      // 1. 保存されたテーマを読み込み、0.00 秒でステータスバーを完全同期
+      // OSへステータスバー色の再描画を即座に強制するヘルパー関数
+      function updateThemeColor(color) {
+        const oldMeta = document.getElementById('theme-color-meta');
+        if (oldMeta) {
+          oldMeta.remove();
+        }
+        const newMeta = document.createElement('meta');
+        newMeta.id = 'theme-color-meta';
+        newMeta.name = 'theme-color';
+        newMeta.content = color;
+        document.head.appendChild(newMeta);
+      }
+
+      // 1. 起動時に保存テーマを読み込み、ステータスバーを完全同化
       const savedTheme = localStorage.getItem('kotutan_theme');
       if (savedTheme === 'dark') {
         document.body.classList.add('dark-theme');
         if (themeBtn) themeBtn.innerHTML = ICON_MOON;
-        if (themeMeta) themeMeta.setAttribute('content', '#231E1B');
+        updateThemeColor('#231E1B');
       } else {
-        if (themeMeta) themeMeta.setAttribute('content', '#FAF5F0');
+        updateThemeColor('#FAF5F0');
       }
 
-      // 2. テーマ切り替えボタンのクリック時処理
+      // 2. テーマ切り替えボタン押下時のリアルタイム完全同化
       if (themeBtn) {
         themeBtn.addEventListener('click', function() {
           const isDark = document.body.classList.toggle('dark-theme');
           if (isDark) {
             themeBtn.innerHTML = ICON_MOON;
             localStorage.setItem('kotutan_theme', 'dark');
-            if (themeMeta) themeMeta.setAttribute('content', '#231E1B');
+            updateThemeColor('#231E1B');
           } else {
             themeBtn.innerHTML = ICON_SUN;
             localStorage.setItem('kotutan_theme', 'light');
-            if (themeMeta) themeMeta.setAttribute('content', '#FAF5F0');
+            updateThemeColor('#FAF5F0');
           }
         });
       }
