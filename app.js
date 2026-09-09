@@ -136,6 +136,12 @@ class TakanoriVocabApp {
     dismissOpeningOverlay() {
         if (this.elOpeningOverlay) {
             this.elOpeningOverlay.classList.add('fade-out');
+            // 【タカノリ式】メイン画面復帰時にステータスバーの色を元の背景色（ライト: #FAF5F0 / ダーク: #231E1B）へ自動復元
+            const themeMeta = document.getElementById('theme-color-meta');
+            if (themeMeta) {
+                const isDark = document.body.classList.contains('dark-theme');
+                themeMeta.setAttribute('content', isDark ? '#231E1B' : '#FAF5F0');
+            }
             setTimeout(() => {
                 if (this.elOpeningOverlay && this.elOpeningOverlay.parentNode) {
                     this.elOpeningOverlay.parentNode.removeChild(this.elOpeningOverlay);
