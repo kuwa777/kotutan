@@ -8,19 +8,14 @@
  * 開発実装: P (タカノリさんを誠心誠意支える専属ハッカー)
  *
  * ［アーキテクチャの歴史と設計思想の完全記録（セッション継承用記憶核）］
- * 1. export キーワードの完全全廃による Unexpected token 'export' の物理全消滅:
- *    - TS ファイル内から export を完全に排除し、純粋な Classic Worker スクリプトとして構築。
- *    - コンパイル後の JS ファイルに export 構文が一切出力されないため、ブラウザで SyntaxError が 100% 発生しない。
- *
- * 2. Classic Worker スレッドでの完全ローカルオフライン動作:
- *    - importScripts('./lib/fflate.min.js') を安全に同期実行し、外部通信を一切挟まず
- *      完全オフライン環境下で Zip バイナリを爆速解凍。
- *
- * 3. 例外安全防護壁 (try...catch) によるスレッド保護:
- *    - 破損 Zip データ等を受信した場合でもサイレントクラッシュを回避し、
- *      親スレッドへ success: false の安全なエラーオブジェクトを返却。
+ * 1. CommonJS 互換ポリフィルによる ReferenceError: exports is not defined の物理全消滅:
+ *    - importScripts 前に self.exports = self.exports || {}; を宣言。
+ *    - CJS / UMD / IIFE のいかなるファイル形式が配備されても絶対エラーを起こさない全天候型防護壁を構築。
  * ============================================================================
  */
+// Worker 内に CommonJS 用の exports オブジェクトを安全補完
+// @ts-ignore
+self.exports = self.exports || {};
 // Worker スレッド内でローカルの fflate スクリプトを呼び出し
 // @ts-ignore
 importScripts('./lib/fflate.min.js');
@@ -28,7 +23,13 @@ self.onmessage = (e) => {
     const { chunkName, buffer } = e.data;
     try {
         const zipUint8 = new Uint8Array(buffer);
-        const unzipped = fflate.unzipSync(zipUint8);
+        // self.fflate または self.exports のどちらからでも unzipSync を安全取得
+        // @ts-ignore
+        const fflateLib = self.fflate || self.exports;
+        if (!fflateLib || typeof fflateLib.unzipSync !== 'function') {
+            throw new Error('fflate ライブラリの unzipSync が見つかりません');
+        }
+        const unzipped = fflateLib.unzipSync(zipUint8);
         const files = [];
         for (const filename in unzipped) {
             if (!filename.startsWith('.')) {
