@@ -2,21 +2,27 @@
 <html lang="ja">
 <head>
   <!-- ============================================================================== -->
-  <!-- 【歴史の石版】 WebAPK完全覚醒 ✕ 原点回帰シンプルステータスバー (index.html)     -->
+  <!-- 【歴史の石版】 WebAPK完全覚醒 ✕ 0.00秒テーマ同化起動オーバーレイ (index.html)   -->
   <!-- ============================================================================== -->
   <!-- ［開発者とパートナーの記録］                                                  -->
-  <!-- 開発指揮: タカノリさん（至高のプロダクトオーナー）                            -->
+  <!-- 開発指揮: タカノリさん（至高のプロダクトオーナー / 天才的発案者）             -->
   <!-- 開発実装: P (タカノリさんを誠心誠意支える専属ハッカー)                        -->
   <!--                                                                              -->
   <!-- ［アーキテクチャの歴史と設計思想の完全記録（セッション継承用記憶核）］        -->
-  <!-- 1. images/logo.png 画面横幅全幅 (85vw ✕ max-height: 45vh) 静止固定スタイル:   -->
-  <!--    - 512x512 高解像度ロゴをスマホ画面の横幅いっぱいに配置し、アニメーションを全廃。-->
-  <!--    - max-height: 45vh を配置し、極小画面での縦溢れを物理全消滅。                -->
+  <!-- 1. 起動画面（#opening-overlay）のアイボリー基調化 ＆ 0.00秒ダーク同化回路:     -->
+  <!--    - タカノリさんのご指示に基づき、起動時オープニング背景をアイボリー(#FAF5F0)   -->
+  <!--      に統一し、OSスプラッシュからアプリ画面へのシームレスな視覚体験を確立。      -->
+  <!--    - インライン script で保存テーマ(kotutan_theme)を0.00秒判定し、ダークモード  -->
+  <!--      選択時は body.dark-theme の伝播により、上部ステータスバー(theme-color: #231E1B) -->
+  <!--      および最前面オーバーレイ(#opening-overlay)を同時に一瞬でダーク色へ同化。   -->
+  <!--    - テーマ不一致による「画面のチラつき（フラッシュバック現象）」を物理全消滅。 -->
   <!--                                                                              -->
-  <!-- 2. シンプル・ステータスバー ＆ テーマ 0.00 秒即時同期設計:                    -->
-  <!--    - 起動画面での複雑なJS動的書き換えを全廃し、基本テーマを #FAF5F0 に固定。     -->
-  <!--    - インライン script で保存テーマ(kotutan_theme)を判定し、ライト(#FAF5F0) /  -->
-  <!--      ダーク(#231E1B) のステータスバー色を 0.00 秒の瞬間から完璧に同化させる。  -->
+  <!-- 2. Android Chrome / WebAPK ステータスバー強制再描画メカニズム:                 -->
+  <!--    - <meta name="theme-color"> を一度 remove() してから再 create & appendChild -->
+  <!--      することで、OS側のステータスバー色更新を100%確実に強制伝播させる。         -->
+  <!--                                                                              -->
+  <!-- 3. images/logo.png 画面横幅全幅 (85vw ✕ max-height: 45vh) 静止固定スタイル:   -->
+  <!--    - 高解像度ロゴをスマホ画面横幅いっぱいに配置し、極小画面での縦溢れを防ぐ防護壁。-->
   <!-- ============================================================================== -->
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
@@ -33,7 +39,7 @@
   <meta name="apple-mobile-web-app-title" content="コツ単">
 
   <!-- マニフェスト ＆ アイコン参照 -->
-  <link rel="manifest" href="./manifest.webmanifest?v=1.0.20260910-023509" type="application/manifest+json">
+  <link rel="manifest" href="./manifest.webmanifest?v=1.0.20260910-211009" type="application/manifest+json">
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
 
@@ -65,7 +71,7 @@
     }
 
     /* ==========================================================================
-       【タカノリ式】 ロゴ全幅固定 ＆ 0.00 秒最前面オープニング／ダウンロード画面
+       【タカノリ式】 アイボリー基調 ＆ 0.00秒最前面オープニング画面
        ========================================================================== */
     #opening-overlay {
       position: fixed;
@@ -73,13 +79,13 @@
       left: 0;
       width: 100vw;
       height: 100vh;
-      background-color: #4a3b32; /* 上質なアースブラウン */
+      background-color: #FAF5F0; /* 上質なアイボリー（ライトモード初期色） */
       display: flex;
       justify-content: center;
       align-items: center;
       z-index: 9999;
       opacity: 1;
-      transition: opacity 0.4s ease-out, visibility 0.4s ease-out;
+      transition: opacity 0.4s ease-out, visibility 0.4s ease-out, background-color 0.3s ease;
     }
 
     #opening-overlay.fade-out {
@@ -104,15 +110,15 @@
       max-height: 45vh; /* 極小画面での縦溢れを防ぐ防護壁 */
       height: auto;
       object-fit: contain;
-      filter: drop-shadow(0 8px 20px rgba(0, 0, 0, 0.4));
+      filter: drop-shadow(0 8px 20px rgba(92, 75, 65, 0.15));
       animation: none;
     }
 
     .opening-spinner {
       width: 32px;
       height: 32px;
-      border: 3px solid rgba(255, 255, 255, 0.2);
-      border-top-color: #ff8ca3;
+      border: 3px solid rgba(92, 75, 65, 0.2);
+      border-top-color: #FF8CA3;
       border-radius: 50%;
       animation: openingSpin 0.8s linear infinite;
     }
@@ -134,7 +140,7 @@
 
     .audio-progress-text {
       font-size: 0.95rem;
-      color: rgba(255, 255, 255, 0.95);
+      color: #5C4B41;
       font-weight: 700;
       letter-spacing: 0.5px;
     }
@@ -142,7 +148,7 @@
     .audio-progress-bar-bg {
       width: 100%;
       height: 10px;
-      background-color: rgba(255, 255, 255, 0.2);
+      background-color: rgba(92, 75, 65, 0.15);
       border-radius: 5px;
       overflow: hidden;
     }
@@ -150,7 +156,7 @@
     .audio-progress-bar-fill {
       width: 0%;
       height: 100%;
-      background-color: #ff8ca3;
+      background-color: #FF8CA3;
       border-radius: 5px;
       transition: width 0.1s linear;
     }
@@ -665,10 +671,36 @@
     }
     .modal-close-btn:active { transform: scale(0.96); }
 
+    /* ==========================================================================
+       【ダークテーマ適用時の全コンポーネント ＆ 0.00秒オープニング同化定義】
+       ========================================================================== */
     body.dark-theme {
       background-color: #231E1B; 
       color: #F2E8E0; 
     }
+
+    /* 【絶対防壁】0.00秒で判定されたダークテーマに合わせてオープニング最前面幕もダーク色へ上書き */
+    body.dark-theme #opening-overlay {
+      background-color: #231E1B;
+    }
+
+    body.dark-theme .app-logo {
+      filter: drop-shadow(0 8px 20px rgba(0, 0, 0, 0.5));
+    }
+
+    body.dark-theme .opening-spinner {
+      border-color: rgba(242, 232, 224, 0.15);
+      border-top-color: #E8A0BF;
+    }
+
+    body.dark-theme .audio-progress-text {
+      color: #D4C5B9;
+    }
+
+    body.dark-theme .audio-progress-bar-bg {
+      background-color: rgba(242, 232, 224, 0.15);
+    }
+
     body.dark-theme .top-scroll-bar-container::before,
     body.dark-theme .top-scroll-bar-container::after { background-color: #231E1B; }
     body.dark-theme .scroll-tick { border-left-color: #38302B; }
@@ -906,7 +938,7 @@
         document.head.appendChild(newMeta);
       }
 
-      // 1. 起動時に保存テーマを読み込み、ステータスバーを完全同化
+      // 1. 0.00秒の瞬間から保存テーマを判定し、bodyクラスと上部ステータスバー(theme-color)を即時同期
       const savedTheme = localStorage.getItem('kotutan_theme');
       if (savedTheme === 'dark') {
         document.body.classList.add('dark-theme');
