@@ -12,7 +12,7 @@
  *
  * ［アーキテクチャの歴史と設計思想の完全記録（セッション継承用記憶核）］
  * 1. TS直接保持バージョン（APP_VERSION）対話比較構造:
- *    - build-deploy.js により 1.0.20260910-224025 プレースホルダーへタイムスタンプが自動注入され、
+ *    - build-deploy.js により 1.0.20260910-225031 プレースホルダーへタイムスタンプが自動注入され、
  *      現在実行中のコード自身とサーバーの version.json を直接比較。
  *
  * 2. HTTP キャッシュ物理無効化 ＋ 5重の絶対防壁 ＋ SW一時解体（Unregister）による100%即時画面差替:
@@ -25,7 +25,7 @@
  * ============================================================================
  */
 // ビルド時に build-deploy.js によってタイムスタンプ（例: 1.0.YYYYMMDD-HHmmss）が注入されます
-export const APP_VERSION = '1.0.20260910-224025';
+export const APP_VERSION = '1.0.20260910-225031';
 const TIMEOUT_MS = 2000; // サーバー通信の厳格タイムアウト（2秒）
 const GRACE_PERIOD_MS = 1200; // 更新前トースト表示 ＆ キャッシュ破棄の猶予時間（1.2秒）
 const SESSION_ATTEMPT_KEY = 'kotutan_update_attempted_ver';
@@ -120,7 +120,7 @@ export async function checkAndApplyUpdates() {
             console.warn('[UpdateManager] 不正なバージョンフォーマットのため棄却いたします:', remoteVersion);
             return;
         }
-        if (APP_VERSION !== '1.0.20260910-224025' && remoteVersion !== APP_VERSION) {
+        if (APP_VERSION !== '1.0.20260910-225031' && remoteVersion !== APP_VERSION) {
             const attemptedVer = sessionStorage.getItem(SESSION_ATTEMPT_KEY);
             if (attemptedVer === remoteVersion) {
                 console.warn(`[UpdateManager] バージョン ${remoteVersion} への重複更新をサーキットブレーカーがブロックいたしました。`);
