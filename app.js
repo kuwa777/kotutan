@@ -405,6 +405,12 @@ class TakanoriVocabApp {
         this.elBtnConfirmCancel = document.getElementById('btn-confirm-cancel');
     }
     attachEventListeners() {
+        // 0. スマホのバックグラウンド（別アプリ切替等）から復帰した瞬間、全自動で更新を同期チェック
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') {
+                checkAndApplyUpdates();
+            }
+        });
         this.setupFlipButtonEvents();
         this.setupAudioButtonEvents(); // 音声ボタン長押し＆トグルイベント設定
         if (this.elBtnNext)
@@ -436,7 +442,7 @@ class TakanoriVocabApp {
                 }
             });
         }
-        // 歯車専用設定モーダル開閉
+        // 歯車専用設定モーダル開閉（バックドロップタップでサッと閉じる）
         if (this.elBtnSettings) {
             this.elBtnSettings.addEventListener('click', () => {
                 if (this.autoPlayState !== 'playing' && this.elSettingsModal) {
