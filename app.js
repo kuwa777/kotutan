@@ -1,38 +1,42 @@
 /**
  * ============================================================================
- * 【歴史の石版】 コツ単 全SVGベクター ✕ パターンB(2秒オープニング/初回100%同期) ✕ 復元 (app.ts)
+ * 【歴史の石版】 コツ単 100%Web一元化 ✕ 音声/反転ダブルロック ✕ テンキー即閉じ (app.ts)
  * ============================================================================
  * ［開発者とパートナーの記録］
- * 開発指揮: タカノリさん（至高のプロダクトオーナー / アルゴリズム設計者）
+ * 開発指揮: タカノリさん（至高のプロダクトオーナー / 真理の看破者）
  * 開発実装: P (タカノリさんを誠心誠意支える専属ハッカー)
  *
  * ［アーキテクチャの歴史と設計思想の完全記録（セッション継承用記憶核）］
- * 1. パターンB（初回全音声同期完了待機 ✕ 2回目以降2.00秒即起動）アーキテクチャ:
- *    - タカノリさんのご指示に基づき、起動時に 2秒最低保証タイマー (minAnimationPromise) を並列配置。
- *    - 初回起動時（未取得チャンクあり）: 2秒経過後も Zip 解凍完了（100%）までプログレスバーを表示して待機。
- *    - 2回目以降（完了済み）: syncAudioFiles が即座に終了するため、2.00秒ぴったりで滑らかにメイン画面を表示。
+ * 1. 反転/音声ダブルロック統合SVG (右：鍵 ✕ 左：機能):
+ *    - タカノリさんの至高のご指示により、鍵マークを右側(x:13〜21)へ共通移動。
+ *    - ICON_FLIP_LOCKED: 左に反転マーク、右に鍵マーク。
+ *    - ICON_AUDIO_LOCKED: 左にスピーカーマーク、右に鍵マーク。
  *
- * 2. 余計な動的書き換えの完全撤去（単一責任原則への原点回帰）:
- *    - dismissOpeningOverlay 内でのステータスバー動的書き換えを全廃。
- *    - 色管理は index.html のインライン script へ一本化し、OSステータスバー色固定トラブルを物理消滅。
+ * 2. テンキーキーボード「→（Enter）」タップ即閉制御:
+ *    - 連番入力欄 (set-from-no / set-to-no) で Enter (KeyCode 13) 押し時に input.blur() を動的発動。
+ *    - OSのフォーカスを外し、電卓キーボードを画面上から一瞬で格納。
  *
- * 3. 無応答事故防止の 60 秒セーフティタイムアウト:
- *    - 通常通信時は進捗バーを 100% まで表示し切ってから幕を下ろす。
- *    - 極端な回線障害時も Promise.race による 60 秒上限で安全にアプリ画面を開く防護壁を確立。
- *
- * 4. タスクキル後0秒完全復元システム ＆ 型安全比較:
- *    - String(w.id) === String(targetWordId) による型安全比較により、閉じる直前の単語カード・
- *      選択フィルター・シャッフル状態へ一発復帰。
+ * 3. モーダル CLOSE ボタン全廃 ✕ バックドロップタップ一元化:
+ *    - CLOSE ボタンの削除に伴い、モーダル外タップ処理のみでサッと閉じる洗練された一画面UIを完成。
  * ============================================================================
  */
 import { checkAndApplyUpdates } from './updateManager.js';
 import { DatabaseService } from './db.js';
 import { AudioCacheManager } from './audioCacheManager.js';
-// 洗練されたSVGベクターアイコン群の定義
+// SVGベクターアイコン群
 const ICON_PREV = `<svg class="icon" viewBox="0 0 24 24" fill="currentColor"><polygon points="18 4 4 12 18 20 18 4"></polygon></svg>`;
 const ICON_NEXT = `<svg class="icon" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 4 20 12 6 20 6 4"></polygon></svg>`;
 const ICON_PAUSE = `<svg class="icon" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1"></rect><rect x="14" y="4" width="4" height="16" rx="1"></rect></svg>`;
-const ICON_STOP = `<svg class="icon" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2" ry="2"></rect></svg>`;
+const ICON_SUN = `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>`;
+const ICON_MOON = `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>`;
+// 通常反転アイコン
+const ICON_FLIP = `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"></path><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"></path></svg>`;
+// 【反転ロック中アイコン】 60x60キャンバス ✕ 左下:無変形反転マーク ✕ 右上:点入り鍵
+const ICON_FLIP_LOCKED = `<svg class="icon" viewBox="0 0 60 60" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><g transform="translate(2, 32)"><path d="M23 4v6h-6"></path><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"></path></g><g><rect x="36" y="16" width="18" height="18" rx="3"></rect><path d="M40 16V11a5 5 0 0 1 10 0v5"></path><circle cx="45" cy="25" r="1.8" fill="currentColor"></circle></g></svg>`;
+// 通常音声アイコン
+const ICON_AUDIO = `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>`;
+// 【音声ロック中アイコン】 60x60キャンバス ✕ 左下:無変形音声マーク ✕ 右上:点入り鍵
+const ICON_AUDIO_LOCKED = `<svg class="icon" viewBox="0 0 60 60" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><g transform="translate(2, 32)"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></g><g><rect x="36" y="16" width="18" height="18" rx="3"></rect><path d="M40 16V11a5 5 0 0 1 10 0v5"></path><circle cx="45" cy="25" r="1.8" fill="currentColor"></circle></g></svg>`;
 class TakanoriVocabApp {
     dbService;
     allWords = [];
@@ -41,6 +45,14 @@ class TakanoriVocabApp {
     isRandomMode = false;
     currentIndex = 0;
     isFlipped = false;
+    // 反転ロックメンバー変数
+    isFlipLocked = false;
+    flipLongPressTimer = null;
+    isFlipLongPressed = false;
+    // 音声ロックメンバー変数
+    isAudioLocked = false;
+    audioLongPressTimer = null;
+    isAudioLongPressed = false;
     currentAudio = null;
     isDragging = false;
     SCOPE_SPAN = 300;
@@ -50,18 +62,20 @@ class TakanoriVocabApp {
     autoPlayIntervalId = null;
     autoPlaySpeed = 2000;
     longPressTimer = null;
-    // 状態復元用 localStorage キー定数
+    // 定数
     STORAGE_LAST_WORD_ID = 'kotutan_last_word_id';
     STORAGE_FILTERS = 'kotutan_selected_filters';
     STORAGE_RANDOM_MODE = 'kotutan_random_mode';
+    STORAGE_THEME = 'kotutan_theme';
     isLongPressed = false;
     hasMovedWhilePaused = false;
-    // DOM エレメント参照
+    // DOM エレメント参照（基本UI）
     elOpeningOverlay;
     elOpeningSpinner;
     elAudioProgressContainer;
     elAudioProgressText;
     elAudioProgressFill;
+    elNumber;
     elTerm;
     elDynamic;
     elGroupContainer;
@@ -79,23 +93,42 @@ class TakanoriVocabApp {
     elBtnMenu;
     elBtnSettings;
     elMenuModal;
-    elBtnCloseModal;
+    elBtnThemeToggle;
     elFilterItems;
     elBtnRandomToggle;
     elSelectSpeed;
     elProgressContainer;
     elProgressFill;
+    // DOM エレメント参照（歯車設定モーダル）
+    elSettingsModal;
+    elCountRed;
+    elCountBlue;
+    elCountYellow;
+    elCountGreen;
+    elSetFromNo;
+    elSetToNo;
+    elSetColorSelector;
+    elBtnExecSet;
+    elResetColorSelector;
+    elBtnExecReset;
+    // DOM エレメント参照（カスタム確認ダイアログ）
+    elConfirmModal;
+    elConfirmMessageArea;
+    elBtnConfirmAction;
+    elBtnConfirmCancel;
+    selectedSetColor = 'red';
+    selectedResetColor = 'red';
+    pendingConfirmAction = null;
     constructor() {
         this.dbService = new DatabaseService();
     }
     async start() {
-        // 1. 背景で安全に自動更新チェックを発動
         checkAndApplyUpdates();
         this.bindDomElements();
+        this.initThemeUI();
         this.loadAutoPlaySpeed();
         this.loadSavedStateAndFilters();
         this.attachEventListeners();
-        // 2. 最低 2000ms（2秒）の重厚ブランディング演出タイマー
         const minAnimationPromise = new Promise(resolve => setTimeout(resolve, 2000));
         try {
             await this.dbService.initialize();
@@ -103,11 +136,9 @@ class TakanoriVocabApp {
             let loadedWords = await this.dbService.getAllCombinedWords();
             loadedWords.sort((a, b) => a.term.localeCompare(b.term, 'en', { sensitivity: 'base' }));
             this.allWords = loadedWords;
-            // 画面の裏側でカードとスクラバーの位置を 0 秒復元
             this.applyFilter(true);
-            // 3. タカノリ式 パターンB 音声同期処理（初回100%表示 ✕ 2回目以降2秒即起動）
             const syncPromise = AudioCacheManager.syncAudioFiles(this.allWords, currentVersionHash, (percent) => {
-                if (this.elAudioProgressContainer && percent < 100) {
+                if (this.elAudioProgressContainer) {
                     if (this.elOpeningSpinner)
                         this.elOpeningSpinner.style.display = 'none';
                     this.elAudioProgressContainer.style.display = 'flex';
@@ -120,7 +151,6 @@ class TakanoriVocabApp {
                 }
             });
             const maxWaitPromise = new Promise(resolve => setTimeout(resolve, 60000));
-            // 最低2秒タイマーを確実に待ち、かつ初回同期の完了（100%）または 60秒タイムアウトまで待機
             await minAnimationPromise;
             await Promise.race([syncPromise, maxWaitPromise]);
             this.registerServiceWorker();
@@ -137,10 +167,24 @@ class TakanoriVocabApp {
             }
         });
     }
+    initThemeUI() {
+        const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
+        if (this.elBtnThemeToggle) {
+            this.elBtnThemeToggle.innerHTML = currentTheme === 'dark' ? ICON_MOON : ICON_SUN;
+        }
+    }
+    toggleTheme() {
+        const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
+        const nextTheme = currentTheme === 'light' ? 'dark' : 'light';
+        document.documentElement.setAttribute('data-theme', nextTheme);
+        localStorage.setItem(this.STORAGE_THEME, nextTheme);
+        if (this.elBtnThemeToggle) {
+            this.elBtnThemeToggle.innerHTML = nextTheme === 'dark' ? ICON_MOON : ICON_SUN;
+        }
+    }
     dismissOpeningOverlay() {
         if (this.elOpeningOverlay) {
             this.elOpeningOverlay.classList.add('fade-out');
-            // 【タカノリ式原点回帰】余計なテーマカラー動的書き換えは全廃し、純粋にオーバーレイを外すのみ
             setTimeout(() => {
                 if (this.elOpeningOverlay && this.elOpeningOverlay.parentNode) {
                     this.elOpeningOverlay.parentNode.removeChild(this.elOpeningOverlay);
@@ -178,7 +222,7 @@ class TakanoriVocabApp {
             }
         }
         catch (e) {
-            console.warn('[App] 状態復元データの読み込みに失敗しました:', e);
+            console.warn('[App] 状態復元データの読み込み失敗:', e);
         }
     }
     loadAutoPlaySpeed() {
@@ -194,9 +238,8 @@ class TakanoriVocabApp {
         let targetWordId = null;
         if (isInitialLoad) {
             const savedId = localStorage.getItem(this.STORAGE_LAST_WORD_ID);
-            if (savedId !== null) {
+            if (savedId !== null)
                 targetWordId = savedId;
-            }
         }
         else if (this.displayWords.length > 0 && this.currentIndex < this.displayWords.length) {
             targetWordId = this.displayWords[this.currentIndex].id;
@@ -205,11 +248,7 @@ class TakanoriVocabApp {
             this.displayWords = [...this.allWords];
         }
         else {
-            this.displayWords = this.allWords.filter(w => {
-                if (!w.groupColor)
-                    return false;
-                return this.selectedFilters.has(w.groupColor);
-            });
+            this.displayWords = this.allWords.filter(w => w.groupColor && this.selectedFilters.has(w.groupColor));
         }
         if (this.isRandomMode) {
             this.shuffleArray(this.displayWords);
@@ -242,7 +281,7 @@ class TakanoriVocabApp {
             localStorage.setItem(this.STORAGE_RANDOM_MODE, this.isRandomMode ? 'true' : 'false');
         }
         catch (e) {
-            console.warn('[App] フィルター状態の保存に失敗しました:', e);
+            console.warn('[App] フィルター保存失敗:', e);
         }
     }
     shuffleArray(array) {
@@ -273,6 +312,8 @@ class TakanoriVocabApp {
         }
     }
     renderEmptyState() {
+        if (this.elNumber)
+            this.elNumber.textContent = "No. -";
         if (this.elTerm)
             this.elTerm.textContent = "該当単語なし";
         while (this.elDynamic.firstChild) {
@@ -300,7 +341,10 @@ class TakanoriVocabApp {
             const savedHash = currentMeta ? currentMeta.dataVersion : '';
             currentHash = serverVersion.data_hash || serverVersion.version;
             let loadedWords = await this.dbService.getAllCombinedWords();
-            const needsSync = loadedWords.length === 0 || savedHash !== currentHash || (loadedWords.length > 0 && loadedWords[0].example_audio === undefined);
+            const needsSync = loadedWords.length === 0 ||
+                savedHash !== currentHash ||
+                (loadedWords.length > 0 && loadedWords[0].example_audio === undefined) ||
+                (loadedWords.length > 0 && loadedWords[0].masterOrder === undefined);
             if (needsSync) {
                 await this.loadMasterJsonData(currentHash);
             }
@@ -318,6 +362,7 @@ class TakanoriVocabApp {
         this.elAudioProgressContainer = document.getElementById('audio-progress-container');
         this.elAudioProgressText = document.getElementById('audio-progress-text');
         this.elAudioProgressFill = document.getElementById('audio-progress-fill');
+        this.elNumber = document.getElementById('display-number');
         this.elTerm = document.getElementById('display-term');
         this.elDynamic = document.getElementById('display-dynamic');
         this.elGroupContainer = document.getElementById('display-group-container');
@@ -335,18 +380,33 @@ class TakanoriVocabApp {
         this.elBtnMenu = document.getElementById('btn-menu');
         this.elBtnSettings = document.getElementById('btn-settings');
         this.elMenuModal = document.getElementById('menu-modal');
-        this.elBtnCloseModal = document.getElementById('btn-close-modal');
+        this.elBtnThemeToggle = document.getElementById('btn-theme-toggle');
         this.elFilterItems = document.querySelectorAll('.filter-color-item');
         this.elBtnRandomToggle = document.getElementById('btn-random-toggle');
         this.elSelectSpeed = document.getElementById('select-auto-speed');
         this.elProgressContainer = document.getElementById('progress-container');
         this.elProgressFill = document.getElementById('progress-fill');
+        // 歯車専用モーダルのDOMバインド
+        this.elSettingsModal = document.getElementById('settings-modal');
+        this.elCountRed = document.getElementById('count-red');
+        this.elCountBlue = document.getElementById('count-blue');
+        this.elCountYellow = document.getElementById('count-yellow');
+        this.elCountGreen = document.getElementById('count-green');
+        this.elSetFromNo = document.getElementById('set-from-no');
+        this.elSetToNo = document.getElementById('set-to-no');
+        this.elSetColorSelector = document.getElementById('set-color-selector');
+        this.elBtnExecSet = document.getElementById('btn-exec-set');
+        this.elResetColorSelector = document.getElementById('reset-color-selector');
+        this.elBtnExecReset = document.getElementById('btn-exec-reset');
+        // カスタム確認ダイアログのDOMバインド
+        this.elConfirmModal = document.getElementById('confirm-modal');
+        this.elConfirmMessageArea = document.getElementById('confirm-message-area');
+        this.elBtnConfirmAction = document.getElementById('btn-confirm-action');
+        this.elBtnConfirmCancel = document.getElementById('btn-confirm-cancel');
     }
     attachEventListeners() {
-        if (this.elBtnFlip)
-            this.elBtnFlip.addEventListener('click', () => this.toggleFlip());
-        if (this.elBtnAudio)
-            this.elBtnAudio.addEventListener('click', () => this.playCurrentSmartAudio());
+        this.setupFlipButtonEvents();
+        this.setupAudioButtonEvents(); // 音声ボタン長押し＆トグルイベント設定
         if (this.elBtnNext)
             this.setupLongPressAndClick(this.elBtnNext, 1);
         if (this.elBtnPrev)
@@ -362,13 +422,77 @@ class TakanoriVocabApp {
                     this.toggleGroupColorOnCurrentWord(colors[index]);
             });
         });
+        const openMenu = () => {
+            if (this.autoPlayState !== 'playing' && this.elMenuModal) {
+                this.elMenuModal.classList.add('active');
+            }
+        };
         if (this.elBtnMenu)
-            this.elBtnMenu.addEventListener('click', () => {
-                if (this.autoPlayState !== 'playing')
-                    this.elMenuModal.classList.add('active');
+            this.elBtnMenu.addEventListener('click', openMenu);
+        if (this.elMenuModal) {
+            this.elMenuModal.addEventListener('click', (e) => {
+                if (e.target === this.elMenuModal) {
+                    this.elMenuModal.classList.remove('active');
+                }
             });
-        if (this.elBtnCloseModal)
-            this.elBtnCloseModal.addEventListener('click', () => this.elMenuModal.classList.remove('active'));
+        }
+        // 歯車専用設定モーダル開閉
+        if (this.elBtnSettings) {
+            this.elBtnSettings.addEventListener('click', () => {
+                if (this.autoPlayState !== 'playing' && this.elSettingsModal) {
+                    this.updateGroupCounts();
+                    this.elSettingsModal.classList.add('active');
+                }
+            });
+        }
+        if (this.elSettingsModal) {
+            this.elSettingsModal.addEventListener('click', (e) => {
+                if (e.target === this.elSettingsModal) {
+                    this.elSettingsModal.classList.remove('active');
+                }
+            });
+        }
+        // テンキーキーボード「→（Enter）」押し時の即時格納バインド
+        this.setupInputEnterBlur(this.elSetFromNo);
+        this.setupInputEnterBlur(this.elSetToNo);
+        // 2セット目 / 3セット目のカラー選択ロジックバインド
+        this.setupColorSelector(this.elSetColorSelector, (col) => this.selectedSetColor = col);
+        this.setupColorSelector(this.elResetColorSelector, (col) => this.selectedResetColor = col);
+        // 一括 SET / RESET の事前確認呼び出し
+        if (this.elBtnExecSet) {
+            this.elBtnExecSet.addEventListener('click', () => this.requestBatchSetConfirm());
+        }
+        if (this.elBtnExecReset) {
+            this.elBtnExecReset.addEventListener('click', () => this.requestBatchResetConfirm());
+        }
+        // カスタム確認ダイアログのボタンイベント
+        if (this.elBtnConfirmAction) {
+            this.elBtnConfirmAction.addEventListener('click', async () => {
+                if (this.pendingConfirmAction) {
+                    const action = this.pendingConfirmAction;
+                    this.pendingConfirmAction = null;
+                    this.closeConfirmModal();
+                    await action();
+                }
+            });
+        }
+        if (this.elBtnConfirmCancel) {
+            this.elBtnConfirmCancel.addEventListener('click', () => {
+                this.pendingConfirmAction = null;
+                this.closeConfirmModal();
+            });
+        }
+        if (this.elConfirmModal) {
+            this.elConfirmModal.addEventListener('click', (e) => {
+                if (e.target === this.elConfirmModal) {
+                    this.pendingConfirmAction = null;
+                    this.closeConfirmModal();
+                }
+            });
+        }
+        if (this.elBtnThemeToggle) {
+            this.elBtnThemeToggle.addEventListener('click', () => this.toggleTheme());
+        }
         this.elFilterItems.forEach(item => {
             item.addEventListener('click', () => {
                 const col = item.getAttribute('data-color');
@@ -408,7 +532,8 @@ class TakanoriVocabApp {
                         clearInterval(this.autoPlayIntervalId);
                     this.startProgressBar();
                     this.autoPlayIntervalId = window.setInterval(() => {
-                        this.isFlipped = false;
+                        if (!this.isFlipLocked)
+                            this.isFlipped = false;
                         if (this.autoPlayDirection === 1)
                             this.nextWord();
                         else
@@ -425,8 +550,238 @@ class TakanoriVocabApp {
             this.elScrubberContainer.addEventListener('pointercancel', (e) => this.handleDragEnd(e));
         }
     }
+    /*
+     * [設計思想・歴史の記録]:
+     * 連番入力欄で電卓キーボードの「→ (Enter)」が押された時、
+     * 自動的に input.blur() を呼び出してフォーカスを解除し、キーボードを閉じるイベントを設定。
+     */
+    setupInputEnterBlur(input) {
+        if (!input)
+            return;
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.keyCode === 13) {
+                input.blur();
+            }
+        });
+    }
+    /*
+     * [設計思想・歴史の記録]:
+     * 音声ボタン (btn-audio) の長押し判定および音声ロック (isAudioLocked) トグル。
+     * - 1000ms（1秒）長押しで 音声ロック (isAudioLocked = true) が発動。
+     * - ロック時はボタンに .audio-locked クラスが付与され「左：スピーカー ✕ 右：鍵」へ変身。
+     * - ロック中にタップすると一発でロック解除されます。
+     */
+    setupAudioButtonEvents() {
+        if (!this.elBtnAudio)
+            return;
+        this.elBtnAudio.addEventListener('pointerdown', () => {
+            this.isAudioLongPressed = false;
+            if (this.audioLongPressTimer)
+                clearTimeout(this.audioLongPressTimer);
+            this.audioLongPressTimer = window.setTimeout(() => {
+                this.isAudioLongPressed = true;
+                this.enableAudioLock();
+            }, 1000);
+        });
+        const clearAudioTimer = () => {
+            if (this.audioLongPressTimer) {
+                clearTimeout(this.audioLongPressTimer);
+                this.audioLongPressTimer = null;
+            }
+        };
+        this.elBtnAudio.addEventListener('pointerup', clearAudioTimer);
+        this.elBtnAudio.addEventListener('pointercancel', clearAudioTimer);
+        this.elBtnAudio.addEventListener('pointerleave', clearAudioTimer);
+        this.elBtnAudio.addEventListener('contextmenu', e => e.preventDefault());
+        this.elBtnAudio.addEventListener('click', () => {
+            if (this.isAudioLongPressed) {
+                this.isAudioLongPressed = false;
+                return;
+            }
+            // ロック中の場合はタップで「解除」
+            if (this.isAudioLocked) {
+                this.disableAudioLock();
+            }
+            else {
+                // 通常時は単発スマート音声再生
+                this.playCurrentSmartAudio();
+            }
+        });
+    }
+    /**
+     * 音声ロックの有効化（1秒長押し時）
+     */
+    enableAudioLock() {
+        this.isAudioLocked = true;
+        if (this.elBtnAudio) {
+            this.elBtnAudio.classList.add('audio-locked');
+            this.elBtnAudio.innerHTML = ICON_AUDIO_LOCKED;
+            this.elBtnAudio.setAttribute('aria-label', '音声ロック解除');
+        }
+        // 即座に現在の音声を鳴らす
+        this.playCurrentSmartAudio();
+    }
+    /**
+     * 音声ロックの解除（タップ時）
+     */
+    disableAudioLock() {
+        this.isAudioLocked = false;
+        if (this.elBtnAudio) {
+            this.elBtnAudio.classList.remove('audio-locked');
+            this.elBtnAudio.innerHTML = ICON_AUDIO;
+            this.elBtnAudio.setAttribute('aria-label', '音声');
+        }
+    }
+    setupColorSelector(container, onSelect) {
+        if (!container)
+            return;
+        const btns = container.querySelectorAll('.fill-box-btn');
+        btns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                btns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                const col = btn.getAttribute('data-color');
+                if (col)
+                    onSelect(col);
+            });
+        });
+    }
+    updateGroupCounts() {
+        const counts = { red: 0, blue: 0, yellow: 0, green: 0 };
+        this.allWords.forEach(w => {
+            if (w.groupColor && counts[w.groupColor] !== undefined) {
+                counts[w.groupColor]++;
+            }
+        });
+        if (this.elCountRed)
+            this.elCountRed.textContent = counts.red.toString();
+        if (this.elCountBlue)
+            this.elCountBlue.textContent = counts.blue.toString();
+        if (this.elCountYellow)
+            this.elCountYellow.textContent = counts.yellow.toString();
+        if (this.elCountGreen)
+            this.elCountGreen.textContent = counts.green.toString();
+    }
+    requestBatchSetConfirm() {
+        const from = parseInt(this.elSetFromNo.value, 10);
+        const to = parseInt(this.elSetToNo.value, 10);
+        if (isNaN(from) || isNaN(to) || from > to) {
+            return;
+        }
+        let targetCount = 0;
+        for (const word of this.allWords) {
+            const masterNo = word.masterOrder || word.id;
+            if (masterNo >= from && masterNo <= to) {
+                targetCount++;
+            }
+        }
+        const colorHtml = `<div class="inline-fill-box ${this.selectedSetColor}"></div>`;
+        const messageHtml = `No. ${from} 〜 No. ${to} の ${targetCount}件に<br>${colorHtml} をセットしますか？`;
+        this.openConfirmModal(messageHtml, 'SET', 'btn-set', async () => {
+            const updates = [];
+            for (const word of this.allWords) {
+                const masterNo = word.masterOrder || word.id;
+                if (masterNo >= from && masterNo <= to) {
+                    word.groupColor = this.selectedSetColor;
+                    updates.push({ id: word.id, groupColor: this.selectedSetColor });
+                }
+            }
+            await this.dbService.bulkUpdateUserStates(updates);
+            this.updateGroupCounts();
+            this.applyFilter();
+        });
+    }
+    requestBatchResetConfirm() {
+        const targetColor = this.selectedResetColor;
+        const targetCount = this.allWords.filter(w => w.groupColor === targetColor).length;
+        if (targetCount === 0)
+            return;
+        const colorHtml = `<div class="inline-fill-box ${targetColor}"></div>`;
+        const messageHtml = `${colorHtml} の ${targetCount}件を<br>リセットしますか？`;
+        this.openConfirmModal(messageHtml, 'RESET', 'btn-reset', async () => {
+            const updates = [];
+            for (const word of this.allWords) {
+                if (word.groupColor === targetColor) {
+                    word.groupColor = null;
+                    updates.push({ id: word.id, groupColor: null });
+                }
+            }
+            await this.dbService.bulkUpdateUserStates(updates);
+            this.updateGroupCounts();
+            this.applyFilter();
+        });
+    }
+    openConfirmModal(htmlMessage, actionLabel, actionBtnClass, onConfirm) {
+        if (!this.elConfirmModal || !this.elConfirmMessageArea || !this.elBtnConfirmAction)
+            return;
+        this.elConfirmMessageArea.innerHTML = htmlMessage;
+        this.elBtnConfirmAction.textContent = actionLabel;
+        this.elBtnConfirmAction.className = `action-submit-btn confirm-action-btn ${actionBtnClass}`;
+        this.pendingConfirmAction = onConfirm;
+        this.elConfirmModal.classList.add('active');
+    }
+    closeConfirmModal() {
+        if (this.elConfirmModal) {
+            this.elConfirmModal.classList.remove('active');
+        }
+    }
+    setupFlipButtonEvents() {
+        if (!this.elBtnFlip)
+            return;
+        this.elBtnFlip.addEventListener('pointerdown', () => {
+            this.isFlipLongPressed = false;
+            if (this.flipLongPressTimer)
+                clearTimeout(this.flipLongPressTimer);
+            this.flipLongPressTimer = window.setTimeout(() => {
+                this.isFlipLongPressed = true;
+                this.enableFlipLock();
+            }, 1000);
+        });
+        const clearFlipTimer = () => {
+            if (this.flipLongPressTimer) {
+                clearTimeout(this.flipLongPressTimer);
+                this.flipLongPressTimer = null;
+            }
+        };
+        this.elBtnFlip.addEventListener('pointerup', clearFlipTimer);
+        this.elBtnFlip.addEventListener('pointercancel', clearFlipTimer);
+        this.elBtnFlip.addEventListener('pointerleave', clearFlipTimer);
+        this.elBtnFlip.addEventListener('contextmenu', e => e.preventDefault());
+        this.elBtnFlip.addEventListener('click', () => {
+            if (this.isFlipLongPressed) {
+                this.isFlipLongPressed = false;
+                return;
+            }
+            if (this.isFlipLocked) {
+                this.disableFlipLock();
+            }
+            else {
+                this.toggleFlip();
+            }
+        });
+    }
+    enableFlipLock() {
+        this.isFlipLocked = true;
+        this.isFlipped = true;
+        if (this.elBtnFlip) {
+            this.elBtnFlip.classList.add('flip-locked');
+            this.elBtnFlip.innerHTML = ICON_FLIP_LOCKED;
+            this.elBtnFlip.setAttribute('aria-label', '反転ロック解除');
+        }
+        this.renderCurrentCard();
+    }
+    disableFlipLock() {
+        this.isFlipLocked = false;
+        this.isFlipped = false;
+        if (this.elBtnFlip) {
+            this.elBtnFlip.classList.remove('flip-locked');
+            this.elBtnFlip.innerHTML = ICON_FLIP;
+            this.elBtnFlip.setAttribute('aria-label', '反転');
+        }
+        this.renderCurrentCard();
+    }
     setupLongPressAndClick(btn, direction) {
-        btn.addEventListener('pointerdown', (e) => {
+        btn.addEventListener('pointerdown', () => {
             if (this.autoPlayState !== 'none')
                 return;
             this.isLongPressed = false;
@@ -435,7 +790,7 @@ class TakanoriVocabApp {
             this.longPressTimer = window.setTimeout(() => {
                 this.isLongPressed = true;
                 this.startAutoPlay(direction);
-            }, 2000);
+            }, 1000);
         });
         const clearTimer = () => {
             if (this.longPressTimer) {
@@ -450,7 +805,7 @@ class TakanoriVocabApp {
         btn.addEventListener('pointercancel', clearTimer);
         btn.addEventListener('pointerleave', clearTimer);
         btn.addEventListener('contextmenu', e => e.preventDefault());
-        btn.addEventListener('click', (e) => {
+        btn.addEventListener('click', () => {
             if (this.isLongPressed) {
                 this.isLongPressed = false;
                 return;
@@ -507,13 +862,15 @@ class TakanoriVocabApp {
         this.autoPlayState = 'playing';
         this.autoPlayDirection = direction;
         this.hasMovedWhilePaused = false;
-        this.isFlipped = false;
+        if (!this.isFlipLocked)
+            this.isFlipped = false;
         this.updateButtonVisuals();
         if (this.autoPlayIntervalId)
             clearInterval(this.autoPlayIntervalId);
         this.startProgressBar();
         this.autoPlayIntervalId = window.setInterval(() => {
-            this.isFlipped = false;
+            if (!this.isFlipLocked)
+                this.isFlipped = false;
             if (this.autoPlayDirection === 1)
                 this.nextWord();
             else
@@ -539,7 +896,8 @@ class TakanoriVocabApp {
         this.updateButtonVisuals();
         if (this.autoPlayIntervalId)
             clearInterval(this.autoPlayIntervalId);
-        this.isFlipped = false;
+        if (!this.isFlipLocked)
+            this.isFlipped = false;
         if (this.hasMovedWhilePaused) {
             this.renderCurrentCard();
             this.centerRulerOnCurrentIndex();
@@ -553,7 +911,8 @@ class TakanoriVocabApp {
         this.hasMovedWhilePaused = false;
         this.startProgressBar();
         this.autoPlayIntervalId = window.setInterval(() => {
-            this.isFlipped = false;
+            if (!this.isFlipLocked)
+                this.isFlipped = false;
             if (this.autoPlayDirection === 1)
                 this.nextWord();
             else
@@ -761,6 +1120,14 @@ class TakanoriVocabApp {
             localStorage.setItem(this.STORAGE_LAST_WORD_ID, word.id.toString());
         }
         catch (e) { }
+        if (this.elNumber) {
+            let displayNumber = word.masterOrder;
+            if (displayNumber === undefined || displayNumber === null) {
+                const foundIdx = this.allWords.findIndex(w => String(w.id) === String(word.id));
+                displayNumber = foundIdx !== -1 ? foundIdx + 1 : 1;
+            }
+            this.elNumber.textContent = `No. ${displayNumber}`;
+        }
         this.elTerm.textContent = word.term;
         while (this.elDynamic.firstChild) {
             this.elDynamic.removeChild(this.elDynamic.firstChild);
@@ -805,6 +1172,10 @@ class TakanoriVocabApp {
                 btn.classList.remove('active');
             }
         });
+        // 【音声ロック連携】 音声ロック発動中(isAudioLocked)ならカード描画と同時に自動再生
+        if (this.isAudioLocked) {
+            this.playCurrentSmartAudio();
+        }
     }
     toggleFlip() {
         this.isFlipped = !this.isFlipped;
@@ -816,6 +1187,12 @@ class TakanoriVocabApp {
         if (this.autoPlayState === 'paused') {
             this.hasMovedWhilePaused = true;
         }
+        if (!this.isFlipLocked) {
+            this.isFlipped = false;
+        }
+        else {
+            this.isFlipped = true;
+        }
         this.currentIndex = (this.currentIndex + 1) % this.displayWords.length;
         this.renderCurrentCard();
         this.centerRulerOnCurrentIndex();
@@ -825,6 +1202,12 @@ class TakanoriVocabApp {
             return;
         if (this.autoPlayState === 'paused') {
             this.hasMovedWhilePaused = true;
+        }
+        if (!this.isFlipLocked) {
+            this.isFlipped = false;
+        }
+        else {
+            this.isFlipped = true;
         }
         this.currentIndex = (this.currentIndex - 1 + this.displayWords.length) % this.displayWords.length;
         this.renderCurrentCard();
@@ -869,7 +1252,12 @@ class TakanoriVocabApp {
             const res = await fetch(`words_master.json?t=${Date.now()}`);
             if (!res.ok)
                 throw new Error('words_master.json の取得失敗');
-            const masterWords = await res.json();
+            const rawWords = await res.json();
+            const masterWords = rawWords.map((word, index) => ({
+                ...word,
+                masterOrder: index + 1,
+                id: (word.id !== undefined && word.id !== null) ? word.id : index + 1
+            }));
             await this.dbService.syncMasterWordsAtomic(masterWords, newVersionHash);
             this.allWords = await this.dbService.getAllCombinedWords();
             this.allWords.sort((a, b) => a.term.localeCompare(b.term, 'en', { sensitivity: 'base' }));
@@ -885,10 +1273,10 @@ class TakanoriVocabApp {
         const registerScript = async () => {
             try {
                 const registration = await navigator.serviceWorker.register('./sw.js', { scope: './' });
-                console.log('[Pの防壁] Service Worker が正常に登録されました スコープ:', registration.scope);
+                console.log('[Pの防壁] Service Worker が正常に登録されました:', registration.scope);
             }
             catch (e) {
-                console.warn('[Pの防壁] Service Worker の登録に失敗しました:', e);
+                console.warn('[Pの防壁] Service Worker の登録に失敗いたしました:', e);
             }
         };
         if (document.readyState === 'complete') {

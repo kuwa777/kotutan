@@ -1,31 +1,20 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html lang="ja" data-theme="light">
 <head>
   <!-- ============================================================================== -->
-  <!-- 【歴史の石版】 黒落ち全廃 ✕ 単一メタ属性直換同化回路 (index.html)             -->
+  <!-- 【歴史の石版】 CLOSEボタン全廃 ✕ 長押し案内セクション ✕ 音声/反転ダブルロック (index.html) -->
   <!-- ============================================================================== -->
   <!-- ［開発者とパートナーの記録］                                                  -->
   <!-- 開発指揮: タカノリさん（至高のプロダクトオーナー / 真理の看破者）             -->
-  <!-- 真因特定: タカノリさん（ステータスバー黒落ち・不一致現象の構造解明）          -->
   <!-- 開発実装: P (タカノリさんを誠心誠意支える専属ハッカー)                        -->
   <!--                                                                              -->
-  <!-- ［設計思想と経緯（3重の深堀りとセルフデバッグの全記録）］                      -->
-  <!-- 1. マニフェスト競合の物理全廃:                                                 -->
-  <!--    - manifest.webmanifest 側に静的 theme_color を記述すると、OSダークモード  -->
-  <!--      時にホワイト(#FAF5F0)が強制固着する事故を起こすため完全排除。            -->
-  <!-- 2. 静的 media 属性（prefers-color-scheme）の全廃:                            -->
-  <!--    - HTMLに media 属性付きメタタグを複数置くと、OS設定とアプリ内手動設定が    -->
-  <!--      食い違った際に OS 側が media 属性を優先し追従しなくなるため廃止。        -->
-  <!-- 3. DOM破棄（remove）による「黒落ち（#000000）」事故の完全全廃:                -->
-  <!--    - JS側で meta[name="theme-color"] を remove() して再生成すると、コンマ    -->
-  <!--      数ミリ秒のタグ消失をOSが検知し、安全装置としてステータスバーを漆黒へ     -->
-  <!--      落として固着させるバグが発生していたため、DOM破棄処理を物理的に粉砕。    -->
-  <!-- 4. 単一メタタグ（#theme-color-meta）に対する setAttribute('content', color)  -->
-  <!--    による安全上書き:                                                          -->
-  <!--    - HTML上には単一の <meta name="theme-color" id="theme-color-meta"> のみを  -->
-  <!--      配置し、JSからは属性直接上書き（setAttribute）のみを行う。               -->
-  <!--    - これによりDOM消失の隙を作らず、ホワイト(#FAF5F0) / グレー(#231E1B) への  -->
-  <!--      100%確実な同化と、OS自動計算による時計アイコン文字色（黒/白）の反転を実現。-->
+  <!-- ［設計思想と経緯の完全記録］                                                  -->
+  <!-- 1. CLOSEボタンの完全全廃（バックドロップタップ一本化）:                      -->
+  <!--    - 不要なボタン領域を削ぎ落とし、縦幅を最大限に解放。背景タップで快適離脱。 -->
+  <!-- 2. 3本メニュー内の新設長押し案内セクション:                                   -->
+  <!--    - スピード欄の補足文を削除し、4アイコン ✕「長押ししてみてね！」を上品配置。 -->
+  <!-- 3. 入力欄 inputmode="numeric" ✕ Enter blur 制御:                             -->
+  <!--    - テンキーキーボードの「→」タップ時に一瞬でキーボードを格納。              -->
   <!-- ============================================================================== -->
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
@@ -34,42 +23,40 @@
   
   <title>コツ単</title>
 
-  <!-- PWA 単一テーマカラーメタ（DOM破棄を防ぎ、IDで直接属性更新する絶対固定タグ） -->
-  <meta name="theme-color" content="#FAF5F0" id="theme-color-meta">
+  <!-- チラつき防止（FOUC対策）の即時テーマ判定インライン処理 -->
+  <script>
+    (function() {
+      try {
+        const savedTheme = localStorage.getItem('kotutan_theme');
+        const systemDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        const theme = savedTheme || (systemDark ? 'dark' : 'light');
+        document.documentElement.setAttribute('data-theme', theme);
+      } catch (e) {}
+    })();
+  </script>
+
   <meta name="color-scheme" content="light dark">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
 
-  <link rel="manifest" href="./manifest.webmanifest?v=1.0.20260911-000700" type="application/manifest+json">
+  <link rel="manifest" href="./manifest.webmanifest?v=1.0.20260912-021515" type="application/manifest+json">
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
 
   <link rel="stylesheet" href="app.css">
 
   <style>
-    /* 【絶対防壁】描画ツリーの絶対頂点 :root と html の地肌をホワイト / グレーで明確に分離 */
-    :root {
-      color-scheme: light;
-      background-color: #FAF5F0;
-    }
-
-    html {
-      background-color: #FAF5F0;
-      color-scheme: light;
+    /* 【オープニング＆基幹レイアウト高速描画用インラインスタイル】 */
+    html, body {
       width: 100vw;
       height: 100dvh;
       overflow: hidden;
-      transition: background-color 0.3s ease, color 0.3s ease;
-    }
-
-    body {
-      background-color: #FAF5F0;
-      color: #5C4B41;
+      margin: 0;
+      padding: 0;
+      background-color: var(--bg-main);
+      color: var(--text-main);
       font-family: "Varela Round", "Hiragino Maru Gothic ProN", "Yu Rounded", "Arial Rounded MT Bold", -apple-system, sans-serif;
-      width: 100vw;
-      height: 100dvh;
-      overflow: hidden;
       transition: background-color 0.3s ease, color 0.3s ease;
     }
 
@@ -124,7 +111,7 @@
       height: auto;
       object-fit: contain;
       filter: drop-shadow(0 8px 20px rgba(92, 75, 65, 0.15));
-      animation: none;
+      transition: filter 0.3s ease;
     }
 
     .opening-spinner {
@@ -183,626 +170,11 @@
       padding-bottom: env(safe-area-inset-bottom);
       position: relative;
     }
-
-    .top-scroll-bar-container {
-      height: 48px;
-      width: 100%;
-      background: transparent;
-      position: relative;
-      display: flex;
-      align-items: center;
-      touch-action: none;
-      cursor: grab;
-      padding: 0 16px;
-      flex-shrink: 0;
-      overflow: hidden;
-      transition: opacity 0.2s, filter 0.2s;
-    }
-    .top-scroll-bar-container:active { cursor: grabbing; }
-
-    .top-scroll-bar-container::before,
-    .top-scroll-bar-container::after {
-      content: '';
-      position: absolute;
-      bottom: 0;
-      width: 16px;
-      height: 18px;
-      background-color: #FAF5F0;
-      z-index: 10;
-    }
-    .top-scroll-bar-container::before { left: 0; }
-    .top-scroll-bar-container::after { right: 0; }
-
-    .track-viewport {
-      position: relative;
-      width: 100%;
-      height: 100%;
-      overflow: visible;
-    }
-
-    .horizontal-scroll-track {
-      position: absolute;
-      top: 0; left: 0;
-      height: 100%;
-      display: flex;
-      align-items: flex-end;
-      padding-bottom: 4px;
-      pointer-events: none;
-      will-change: transform;
-      transition: transform 0.35s cubic-bezier(0.25, 1, 0.5, 1);
-    }
-
-    .scroll-tick {
-      position: absolute;
-      bottom: 4px;
-      height: 10px;
-      border-left: 2px solid #EAE0D5;
-      border-radius: 2px;
-      transition: border-color 0.3s ease;
-    }
-
-    .scroll-tick.boundary::after {
-      content: attr(data-char);
-      position: absolute;
-      top: -20px;
-      left: 50%;
-      transform: translateX(-50%);
-      font-size: 0.8rem;
-      font-weight: 900;
-      color: #E2A099;
-      pointer-events: none;
-      white-space: nowrap;
-      transition: color 0.3s ease;
-    }
-
-    .seeker-pointer {
-      position: absolute;
-      top: 14px;
-      width: 6px;
-      height: 24px;
-      background-color: #FFB3B3;
-      border-radius: 4px;
-      box-shadow: 0 0 12px rgba(255, 179, 179, 0.8);
-      pointer-events: none;
-      z-index: 20;
-      transform: translateX(-50%);
-      transition: left 0.35s cubic-bezier(0.25, 1, 0.5, 1);
-    }
-
-    .top-scroll-bar-container.dragging .horizontal-scroll-track,
-    .top-scroll-bar-container.dragging .seeker-pointer {
-      transition: none;
-    }
-
-    .scrubber-tooltip {
-      position: absolute;
-      top: 54px;
-      transform: translateX(-50%);
-      background: rgba(255, 179, 179, 0.95);
-      color: #FFFFFF;
-      padding: 6px 18px;
-      border-radius: 20px;
-      font-size: 1.1rem;
-      font-weight: bold;
-      box-shadow: 4px 4px 10px rgba(210, 195, 185, 0.5);
-      pointer-events: none;
-      opacity: 0;
-      transition: opacity 0.15s ease;
-      z-index: 100;
-      white-space: nowrap;
-    }
-    .scrubber-tooltip.visible { opacity: 1; }
-
-    .grid-layout {
-      flex: 1;
-      display: grid;
-      grid-template-columns: repeat(5, 1fr);
-      grid-template-rows: 1fr auto auto;
-      gap: 10px;
-      padding: 6px 16px 16px 16px;
-      position: relative;
-      height: calc(100dvh - 48px);
-    }
-
-    .word-display-area {
-      grid-column: 1 / span 5;
-      grid-row: 1;
-      background-color: #FAF5F0;
-      border-radius: 32px;
-      box-shadow: 10px 10px 20px rgba(210, 195, 185, 0.6), 
-                 -10px -10px 20px rgba(255, 255, 255, 1);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 16px 20px;
-      position: relative;
-      height: 100%;
-      overflow: hidden;
-      transition: color 0.3s ease;
-    }
-
-    .card-top-bar {
-      width: 100%;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      height: 32px;
-      z-index: 10;
-    }
-
-    .icon-btn-header {
-      background: transparent;
-      border: none;
-      color: #A39387;
-      font-size: 1.4rem;
-      width: 40px;
-      height: 40px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      transition: opacity 0.2s, transform 0.2s, color 0.3s ease;
-    }
-    .icon-btn-header:active { transform: scale(0.9); }
-
-    .group-indicator-container {
-      display: flex;
-      gap: 8px;
-      align-items: center;
-      justify-content: center;
-      min-height: 24px;
-    }
-
-    .group-indicator-badge-all {
-      font-size: 0.85rem;
-      font-weight: 800;
-      padding: 4px 12px;
-      border-radius: 12px;
-      background: #F2E8E0;
-      color: #8A7B70;
-      box-shadow: inset 2px 2px 5px rgba(210, 195, 185, 0.6), 
-                  inset -2px -2px 5px rgba(255, 255, 255, 1);
-      letter-spacing: 1px;
-      transition: color 0.3s ease;
-    }
-
-    .header-color-box {
-      width: 16px;
-      height: 16px;
-      border-radius: 50%;
-      box-shadow: 2px 2px 5px rgba(210, 195, 185, 0.5);
-    }
-    .header-color-box.red    { background-color: #FFB3B3; }
-    .header-color-box.blue   { background-color: #B3D1FF; }
-    .header-color-box.yellow { background-color: #FFF0B3; }
-    .header-color-box.green  { background-color: #B3E6B3; }
-    .header-color-box.blank  { visibility: hidden; }
-
-    .word-term-fixed {
-      font-size: 2.8rem;
-      font-weight: 900;
-      margin-top: 10px;
-      color: #5C4B41;
-      text-align: center;
-      flex-shrink: 0;
-      letter-spacing: 1px;
-      transition: color 0.3s ease;
-    }
-
-    .auto-play-progress-container {
-      width: 75%;
-      max-width: 240px;
-      height: 6px;
-      border-radius: 3px;
-      background-color: #EAE0D5;
-      margin: 12px 0 8px 0;
-      opacity: 0;
-      transition: opacity 0.3s ease;
-      overflow: hidden;
-      flex-shrink: 0;
-      box-shadow: inset 1px 1px 3px rgba(210, 195, 185, 0.5);
-    }
-    .auto-play-progress-container.active { opacity: 1; }
-    .auto-play-progress-fill {
-      height: 100%;
-      width: 0%;
-      background: linear-gradient(90deg, #A8E6CF, #DCEDC1);
-      border-radius: 3px;
-      box-shadow: 0 0 8px rgba(168, 230, 207, 0.8);
-    }
-
-    .word-dynamic-content {
-      margin-top: 4px;
-      width: 100%;
-      text-align: center;
-      overflow-y: auto;
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: flex-start;
-      padding: 0 10px;
-    }
-
-    .word-ipa-text { font-size: 1.4rem; color: #A39387; font-weight: bold; transition: color 0.3s ease; }
-    .word-example-text {
-      font-size: 1.15rem;
-      color: #7A695E;
-      line-height: 1.5;
-      text-align: left;
-      width: 100%;
-      word-break: break-word;
-      margin-top: 10px;
-      transition: color 0.3s ease;
-    }
-
-    .group-bar-container {
-      grid-column: 1 / span 5;
-      grid-row: 2;
-      display: flex;
-      justify-content: space-around;
-      align-items: center;
-      padding: 6px 12px;
-    }
-
-    .group-square-btn {
-      width: 48px;
-      height: 48px;
-      border-radius: 16px;
-      background: #FAF5F0;
-      border: 4px solid;
-      cursor: pointer;
-      box-shadow: 6px 6px 12px rgba(210, 195, 185, 0.6), 
-                 -6px -6px 12px rgba(255, 255, 255, 1);
-      transition: transform 0.2s;
-    }
-    .group-square-btn:active {
-      box-shadow: inset 4px 4px 8px rgba(210, 195, 185, 0.6), 
-                  inset -4px -4px 8px rgba(255, 255, 255, 1);
-      transform: scale(0.94);
-    }
-
-    .group-red    { border-color: #FFB3B3; }
-    .group-red.active { background: #FFB3B3; }
-    .group-blue   { border-color: #B3D1FF; }
-    .group-blue.active { background: #B3D1FF; }
-    .group-yellow { border-color: #FFF0B3; }
-    .group-yellow.active { background: #FFF0B3; }
-    .group-green  { border-color: #B3E6B3; }
-    .group-green.active { background: #B3E6B3; }
-
-    .btn-action {
-      background: #FAF5F0;
-      color: #5C4B41;
-      border: none;
-      border-radius: 20px;
-      height: 60px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      box-shadow: 6px 6px 15px rgba(210, 195, 185, 0.6), 
-                 -6px -6px 15px rgba(255, 255, 255, 1);
-      z-index: 5;
-      transition: transform 0.2s;
-    }
-    .btn-action:active { 
-      box-shadow: inset 4px 4px 10px rgba(210, 195, 185, 0.6), 
-                  inset -4px -4px 10px rgba(255, 255, 255, 1);
-      transform: scale(0.96); 
-    }
-
-    .btn-disabled {
-      opacity: 0.4 !important;
-      pointer-events: none !important;
-      background: #EAE0D5 !important;
-      box-shadow: none !important;
-      color: #A39387 !important;
-      border-color: #D6C9BE !important;
-    }
-
-    .btn-flip  { grid-column: 1; grid-row: 3; }
-    .btn-audio { grid-column: 2; grid-row: 3; }
-    
-    .btn-stop {
-      grid-column: 3; grid-row: 3;
-      color: #FF8A8A;
-      display: none;
-    }
-    
-    .btn-left  { grid-column: 4; grid-row: 3; }
-    .btn-right { grid-column: 5; grid-row: 3; }
-
-    .modal-overlay {
-      position: fixed;
-      top: 0; left: 0;
-      width: 100vw; height: 100dvh;
-      background: rgba(92, 75, 65, 0.5);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 1000;
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 0.2s ease;
-    }
-    .modal-overlay.active { opacity: 1; pointer-events: auto; }
-
-    .modal-card {
-      background: #FAF5F0;
-      border-radius: 32px;
-      width: 85%;
-      max-width: 320px;
-      padding: 28px 24px 24px 24px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 20px;
-      box-shadow: 10px 10px 30px rgba(150, 135, 125, 0.3);
-      border: none;
-      transition: color 0.3s ease;
-    }
-
-    .filter-color-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 16px;
-      width: 100%;
-    }
-
-    .filter-color-item {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 16px;
-      border-radius: 20px;
-      background: #FAF5F0;
-      cursor: pointer;
-      box-shadow: 4px 4px 10px rgba(210, 195, 185, 0.6), 
-                 -4px -4px 10px rgba(255, 255, 255, 1);
-      transition: transform 0.2s;
-    }
-    .filter-color-item:active { transform: scale(0.95); }
-
-    .filter-box-icon {
-      width: 36px;
-      height: 36px;
-      border-radius: 12px;
-      border: 4px solid;
-      background: transparent;
-    }
-
-    .filter-box-icon.red    { border-color: #FFB3B3; }
-    .filter-box-icon.red.active { background: #FFB3B3; }
-    .filter-box-icon.blue   { border-color: #B3D1FF; }
-    .filter-box-icon.blue.active { background: #B3D1FF; }
-    .filter-box-icon.yellow { border-color: #FFF0B3; }
-    .filter-box-icon.yellow.active { background: #FFF0B3; }
-    .filter-box-icon.green  { border-color: #B3E6B3; }
-    .filter-box-icon.green.active { background: #B3E6B3; }
-
-    .modal-split-row {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 16px;
-      width: 100%;
-    }
-
-    .theme-toggle-icon-btn, .modal-random-btn {
-      width: 100%;
-      height: 56px;
-      border-radius: 16px;
-      background: #FAF5F0;
-      border: none;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      box-shadow: 5px 5px 10px rgba(210, 195, 185, 0.6), 
-                 -5px -5px 10px rgba(255, 255, 255, 1);
-      transition: transform 0.25s ease;
-    }
-
-    .theme-toggle-icon-btn { color: #FFB338; }
-    .modal-random-btn { color: #5C4B41; }
-
-    .theme-toggle-icon-btn:active, .modal-random-btn:active {
-      box-shadow: inset 3px 3px 6px rgba(210, 195, 185, 0.6), 
-                  inset -3px -3px 6px rgba(255, 255, 255, 1);
-      transform: scale(0.93);
-    }
-
-    .modal-random-btn.active {
-      background: #FFF0B3;
-      color: #E6A800;
-      box-shadow: inset 3px 3px 6px rgba(210, 195, 185, 0.4), 
-                  inset -3px -3px 6px rgba(255, 255, 255, 1);
-    }
-
-    .setting-section {
-      width: 100%;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      border-top: 2px solid #EAE0D5;
-      padding-top: 16px;
-      margin-top: 4px;
-      transition: border-color 0.3s ease;
-    }
-    .setting-label {
-      font-size: 0.9rem;
-      color: #7A695E;
-      font-weight: 800;
-      text-align: left;
-      transition: color 0.3s ease;
-    }
-    .setting-subtext {
-      font-size: 0.75rem;
-      color: #A39387;
-      font-weight: normal;
-      margin-top: 2px;
-      display: block;
-      transition: color 0.3s ease;
-    }
-
-    .setting-select {
-      width: 100%;
-      padding: 12px 14px;
-      border-radius: 16px;
-      background: #FAF5F0;
-      border: none;
-      color: #5C4B41;
-      font-size: 1.05rem;
-      font-weight: 800;
-      outline: none;
-      cursor: pointer;
-      appearance: none;
-      box-shadow: inset 4px 4px 8px rgba(210, 195, 185, 0.6), 
-                  inset -4px -4px 8px rgba(255, 255, 255, 1);
-      transition: color 0.3s ease;
-    }
-
-    .modal-close-btn {
-      width: 100%;
-      padding: 16px;
-      background: #EAE0D5;
-      border: none;
-      border-radius: 16px;
-      color: #7A695E;
-      font-weight: 900;
-      font-size: 1rem;
-      letter-spacing: 1px;
-      cursor: pointer;
-      box-shadow: 4px 4px 10px rgba(210, 195, 185, 0.5), 
-                 -4px -4px 10px rgba(255, 255, 255, 1);
-      transition: transform 0.2s;
-    }
-    .modal-close-btn:active { transform: scale(0.96); }
-
-    /* 【絶対防壁】最背面キャンバス html / body への強力なるダーク同化宣言 */
-    :root.dark-theme,
-    html.dark-theme {
-      background-color: #231E1B;
-      color-scheme: dark;
-    }
-
-    body.dark-theme {
-      background-color: #231E1B; 
-      color: #F2E8E0; 
-      color-scheme: dark;
-    }
-
-    body.dark-theme #opening-overlay {
-      background-color: #231E1B;
-    }
-
-    body.dark-theme .app-logo {
-      filter: drop-shadow(0 8px 20px rgba(0, 0, 0, 0.5));
-    }
-
-    body.dark-theme .opening-spinner {
-      border-color: rgba(242, 232, 224, 0.15);
-      border-top-color: #E8A0BF;
-    }
-
-    body.dark-theme .audio-progress-text {
-      color: #D4C5B9;
-    }
-
-    body.dark-theme .audio-progress-bar-bg {
-      background-color: rgba(242, 232, 224, 0.15);
-    }
-
-    body.dark-theme .top-scroll-bar-container::before,
-    body.dark-theme .top-scroll-bar-container::after { background-color: #231E1B; }
-    body.dark-theme .scroll-tick { border-left-color: #38302B; }
-    body.dark-theme .scroll-tick.boundary::after { color: #E8A0BF; }
-    body.dark-theme .seeker-pointer { background-color: #E8A0BF; box-shadow: 0 0 12px rgba(232, 160, 191, 0.6); }
-    body.dark-theme .scrubber-tooltip { background: rgba(232, 160, 191, 0.95); color: #231E1B; box-shadow: 4px 4px 10px rgba(15, 12, 10, 0.6); }
-    
-    body.dark-theme .word-display-area {
-      background-color: #231E1B;
-      box-shadow: 8px 8px 18px rgba(12, 10, 8, 0.85), -6px -6px 15px rgba(55, 48, 43, 0.4);
-    }
-    body.dark-theme .icon-btn-header { color: #A8988D; }
-    body.dark-theme .group-indicator-badge-all {
-      background: #1A1614; color: #B8A89D;
-      box-shadow: inset 2px 2px 5px rgba(10, 8, 6, 0.8), inset -2px -2px 5px rgba(50, 43, 38, 0.3);
-    }
-    body.dark-theme .word-term-fixed { color: #F2E8E0; }
-    body.dark-theme .auto-play-progress-container { background-color: #1A1614; box-shadow: inset 1px 1px 3px rgba(10, 8, 6, 0.8); }
-    body.dark-theme .word-ipa-text { color: #A8988D; }
-    body.dark-theme .word-example-text { color: #D4C5B9; }
-
-    body.dark-theme .group-square-btn {
-      background: #231E1B;
-      box-shadow: 6px 6px 14px rgba(12, 10, 8, 0.85), -5px -5px 12px rgba(55, 48, 43, 0.4);
-    }
-    body.dark-theme .group-square-btn:active {
-      box-shadow: inset 3px 3px 6px rgba(10, 8, 6, 0.85), inset -3px -3px 6px rgba(55, 48, 43, 0.4);
-    }
-    body.dark-theme .group-red    { border-color: #E8A0BF; }
-    body.dark-theme .group-red.active { background: #E8A0BF; }
-    body.dark-theme .group-blue   { border-color: #89B4E8; }
-    body.dark-theme .group-blue.active { background: #89B4E8; }
-    body.dark-theme .group-yellow { border-color: #F2D283; }
-    body.dark-theme .group-yellow.active { background: #F2D283; }
-    body.dark-theme .group-green  { border-color: #83C5BE; }
-    body.dark-theme .group-green.active { background: #83C5BE; }
-
-    body.dark-theme .btn-action {
-      background: #231E1B;
-      color: #F2E8E0;
-      box-shadow: 6px 6px 15px rgba(12, 10, 8, 0.85), -5px -5px 12px rgba(55, 48, 43, 0.4);
-    }
-    body.dark-theme .btn-action:active {
-      box-shadow: inset 4px 4px 8px rgba(10, 8, 6, 0.85), inset -4px -4px 8px rgba(55, 48, 43, 0.4);
-    }
-    body.dark-theme .btn-disabled { background: #1A1614 !important; color: #5C5047 !important; box-shadow: none !important; }
-    body.dark-theme .btn-stop { color: #FF8A8A; }
-
-    body.dark-theme .modal-overlay { background: rgba(10, 8, 6, 0.7); }
-    body.dark-theme .modal-card { background: #231E1B; box-shadow: 10px 10px 30px rgba(5, 4, 3, 0.8); }
-    body.dark-theme .filter-color-item {
-      background: #231E1B;
-      box-shadow: 4px 4px 10px rgba(12, 10, 8, 0.85), -4px -4px 10px rgba(55, 48, 43, 0.4);
-    }
-    body.dark-theme .filter-box-icon.red    { border-color: #E8A0BF; }
-    body.dark-theme .filter-box-icon.red.active { background: #E8A0BF; }
-    body.dark-theme .filter-box-icon.blue   { border-color: #89B4E8; }
-    body.dark-theme .filter-box-icon.blue.active { background: #89B4E8; }
-    body.dark-theme .filter-box-icon.yellow { border-color: #F2D283; }
-    body.dark-theme .filter-box-icon.yellow.active { background: #F2D283; }
-    body.dark-theme .filter-box-icon.green  { border-color: #83C5BE; }
-    body.dark-theme .filter-box-icon.green.active { background: #83C5BE; }
-
-    body.dark-theme .modal-random-btn, body.dark-theme .theme-toggle-icon-btn {
-      background: #231E1B;
-      color: #F2E8E0;
-      box-shadow: 5px 5px 10px rgba(12, 10, 8, 0.85), -4px -4px 10px rgba(55, 48, 43, 0.4);
-    }
-    body.dark-theme .theme-toggle-icon-btn { color: #C8B6FF; }
-    body.dark-theme .modal-random-btn.active {
-      background: #F2D283; color: #231E1B; box-shadow: inset 3px 3px 6px rgba(10, 8, 6, 0.6);
-    }
-    body.dark-theme .theme-toggle-icon-btn:active, body.dark-theme .modal-random-btn:active {
-      box-shadow: inset 3px 3px 6px rgba(10, 8, 6, 0.85), inset -3px -3px 6px rgba(55, 48, 43, 0.4);
-    }
-
-    body.dark-theme .setting-section { border-top-color: #38302B; }
-    body.dark-theme .setting-label { color: #D4C5B9; }
-    body.dark-theme .setting-subtext { color: #A8988D; }
-    body.dark-theme .setting-select {
-      background: #231E1B; color: #F2E8E0;
-      box-shadow: inset 4px 4px 8px rgba(10, 8, 6, 0.85), inset -4px -4px 8px rgba(55, 48, 43, 0.4);
-    }
-    body.dark-theme .modal-close-btn {
-      background: #38302B; color: #D4C5B9; box-shadow: 4px 4px 10px rgba(12, 10, 8, 0.6);
-    }
   </style>
 </head>
 <body>
 
+  <!-- オープニングオーバーレイ -->
   <div id="opening-overlay">
     <div class="opening-content">
       <img src="images/logo.png" class="app-logo" alt="コツ単">
@@ -816,7 +188,9 @@
     </div>
   </div>
 
+  <!-- メインアプリケーション画面 -->
   <div class="app-container">
+    <!-- スクラバーバー -->
     <div class="top-scroll-bar-container" id="scrubber-container">
       <div class="track-viewport" id="track-viewport">
         <div class="horizontal-scroll-track" id="scroll-track"></div>
@@ -825,7 +199,9 @@
       <div class="scrubber-tooltip" id="scrubber-tooltip">ability</div>
     </div>
 
+    <!-- グリッドレイアウト -->
     <div class="grid-layout">
+      <!-- 単語表示カード -->
       <div class="word-display-area" id="word-card">
         <div class="card-top-bar">
           <button class="icon-btn-header" id="btn-menu" aria-label="メニュー">☰</button>
@@ -834,6 +210,10 @@
           </div>
           <button class="icon-btn-header" id="btn-settings" aria-label="設定">⚙</button>
         </div>
+
+        <!-- 単語の絶対連番表示用要素 (No. X) -->
+        <div class="word-number-label" id="display-number">No. --</div>
+
         <div class="word-term-fixed" id="display-term">読み込み中...</div>
         <div class="auto-play-progress-container" id="progress-container">
           <div class="auto-play-progress-fill" id="progress-fill"></div>
@@ -843,13 +223,15 @@
         </div>
       </div>
 
+      <!-- カラーグループ登録バー -->
       <div class="group-bar-container">
-        <button class="group-square-btn group-red"></button>
-        <button class="group-square-btn group-blue"></button>
-        <button class="group-square-btn group-yellow"></button>
-        <button class="group-square-btn group-green"></button>
+        <button class="group-square-btn group-red" aria-label="赤グループ"></button>
+        <button class="group-square-btn group-blue" aria-label="青グループ"></button>
+        <button class="group-square-btn group-yellow" aria-label="黄グループ"></button>
+        <button class="group-square-btn group-green" aria-label="緑グループ"></button>
       </div>
 
+      <!-- アクションボタン群 -->
       <button class="btn-action btn-flip" id="btn-flip" aria-label="反転">
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"></path><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"></path></svg>
       </button>
@@ -869,8 +251,10 @@
       </button>
     </div>
 
+    <!-- モーダル1（左側三本メニュー：フィルター・テーマ・速度・長押し案内） -->
     <div class="modal-overlay" id="menu-modal">
       <div class="modal-card">
+        <!-- カラーフィルター選択 -->
         <div class="filter-color-grid">
           <div class="filter-color-item" data-color="red"><div class="filter-box-icon red"></div></div>
           <div class="filter-color-item" data-color="blue"><div class="filter-box-icon blue"></div></div>
@@ -878,21 +262,18 @@
           <div class="filter-color-item" data-color="green"><div class="filter-box-icon green"></div></div>
         </div>
         
+        <!-- モード切替ボタン群 -->
         <div class="modal-split-row">
-          <button class="theme-toggle-icon-btn" id="btn-theme-toggle" aria-label="テーマ切替">
-            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
-          </button>
+          <button class="theme-toggle-icon-btn" id="btn-theme-toggle" aria-label="テーマ切替"></button>
           
           <button class="modal-random-btn" id="btn-random-toggle" aria-label="シャッフル">
             <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 3 21 3 21 8"></polyline><line x1="4" y1="20" x2="21" y2="3"></line><polyline points="21 16 21 21 16 21"></polyline><line x1="15" y1="15" x2="21" y2="21"></line><line x1="4" y1="4" x2="9" y2="9"></line></svg>
           </button>
         </div>
         
+        <!-- 速度設定 -->
         <div class="setting-section">
-          <div class="setting-label">
-            ▶ 連続再生スピード
-            <span class="setting-subtext">（左or右を長押しで発動）</span>
-          </div>
+          <div class="setting-label">▶ 連続再生スピード</div>
           <select class="setting-select" id="select-auto-speed">
             <option value="700">鬼</option>
             <option value="1000">1.0秒</option>
@@ -903,94 +284,76 @@
           </select>
         </div>
 
-        <button class="modal-close-btn" id="btn-close-modal">CLOSE</button>
+        <!-- アプリの長押し案内セクション -->
+        <div class="setting-section tip-section">
+          <div class="tip-icon-row">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"></path><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"></path></svg>
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+            <svg class="icon" viewBox="0 0 24 24" fill="currentColor"><polygon points="18 4 4 12 18 20 18 4"></polygon></svg>
+            <svg class="icon" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 4 20 12 6 20 6 4"></polygon></svg>
+          </div>
+          <div class="tip-text">長押ししてみてね！</div>
+        </div>
       </div>
     </div>
+
+    <!-- モーダル2（右側歯車メニュー：一画面完全格納・CLOSEボタン全廃） -->
+    <div class="modal-overlay" id="settings-modal">
+      <div class="modal-card settings-card">
+
+        <!-- 【1セット目】各グループのリアルタイム登録数 -->
+        <div class="set-section">
+          <div class="color-grid-2x2 font-bold">
+            <div class="count-item"><div class="fill-box red"></div><span id="count-red">0</span>個</div>
+            <div class="count-item"><div class="fill-box blue"></div><span id="count-blue">0</span>個</div>
+            <div class="count-item"><div class="fill-box yellow"></div><span id="count-yellow">0</span>個</div>
+            <div class="count-item"><div class="fill-box green"></div><span id="count-green">0</span>個</div>
+          </div>
+        </div>
+
+        <!-- 【2セット目】連番範囲指定で一括グループ登録 (SET) -->
+        <div class="set-section">
+          <div class="range-input-row">
+            <input type="number" id="set-from-no" placeholder="No.開始" min="1" inputmode="numeric" pattern="[0-9]*">
+            <span>〜</span>
+            <input type="number" id="set-to-no" placeholder="No.終了" min="1" inputmode="numeric" pattern="[0-9]*">
+          </div>
+          <div class="color-grid-2x2" id="set-color-selector">
+            <div class="fill-box-btn red active" data-color="red"></div>
+            <div class="fill-box-btn blue" data-color="blue"></div>
+            <div class="fill-box-btn yellow" data-color="yellow"></div>
+            <div class="fill-box-btn green" data-color="green"></div>
+          </div>
+          <button class="action-submit-btn btn-set" id="btn-exec-set">SET</button>
+        </div>
+
+        <!-- 【3セット目】丸ごと一括グループ解除 (RESET) -->
+        <div class="set-section">
+          <div class="color-grid-2x2" id="reset-color-selector">
+            <div class="fill-box-btn red active" data-color="red"></div>
+            <div class="fill-box-btn blue" data-color="blue"></div>
+            <div class="fill-box-btn yellow" data-color="yellow"></div>
+            <div class="fill-box-btn green" data-color="green"></div>
+          </div>
+          <button class="action-submit-btn btn-reset" id="btn-exec-reset">RESET</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- モーダル3（アプリ専用・HTMLカラーボックス入り選択式確認ダイアログ） -->
+    <div class="modal-overlay" id="confirm-modal" style="z-index: 2000;">
+      <div class="modal-card confirm-card">
+        <div class="confirm-message-container" id="confirm-message-area">
+          <!-- JSで生のHTMLカラーボックス入りメッセージが動的注入されます -->
+        </div>
+        <div class="confirm-btn-row">
+          <button class="action-submit-btn confirm-action-btn" id="btn-confirm-action">SET</button>
+          <button class="modal-close-btn confirm-cancel-btn" id="btn-confirm-cancel">CANCEL</button>
+        </div>
+      </div>
+    </div>
+
   </div>
-
-  <script>
-    (function() {
-      const themeBtn = document.getElementById('btn-theme-toggle');
-      const menuBtn = document.getElementById('btn-menu');
-      const settingsBtn = document.getElementById('btn-settings');
-      const closeModalBtn = document.getElementById('btn-close-modal');
-      const menuModal = document.getElementById('menu-modal');
-
-      const ICON_SUN = `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>`;
-      const ICON_MOON = `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>`;
-
-      // 【絶対安全】タグの一時削除(remove)を物理全廃し、setAttributeで属性のみ直接上書き更新する
-      function updateThemeAndStatusBar() {
-        const isDark = document.body.classList.contains('dark-theme');
-        const targetColor = isDark ? '#231E1B' : '#FAF5F0';
-
-        // 1. 最背面 html / body のクラスおよび color-scheme を動的に切り替え
-        document.documentElement.classList.toggle('dark-theme', isDark);
-
-        // 2. DOM破棄を起こさず、既存の単一メタタグの content 属性を直接上書き更新
-        // これにより、一瞬のメタ消失による「黒塗り潰し（漆黒フォールバック）」を確実に全滅させます
-        const metaTag = document.getElementById('theme-color-meta');
-        if (metaTag) {
-          metaTag.setAttribute('content', targetColor);
-        }
-      }
-
-      const savedTheme = localStorage.getItem('kotutan_theme');
-      const systemDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-      const isDark = savedTheme ? (savedTheme === 'dark') : systemDark;
-
-      if (isDark) {
-        document.documentElement.classList.add('dark-theme');
-        document.body.classList.add('dark-theme');
-        if (themeBtn) themeBtn.innerHTML = ICON_MOON;
-      }
-      
-      updateThemeAndStatusBar();
-
-      if (themeBtn) {
-        themeBtn.addEventListener('click', function() {
-          const currentlyDark = document.body.classList.toggle('dark-theme');
-          document.documentElement.classList.toggle('dark-theme', currentlyDark);
-
-          if (currentlyDark) {
-            themeBtn.innerHTML = ICON_MOON;
-            localStorage.setItem('kotutan_theme', 'dark');
-          } else {
-            themeBtn.innerHTML = ICON_SUN;
-            localStorage.setItem('kotutan_theme', 'light');
-          }
-
-          updateThemeAndStatusBar();
-        });
-      }
-
-      function openModal() {
-        if (menuModal) {
-          menuModal.classList.add('active');
-          updateThemeAndStatusBar();
-        }
-      }
-
-      function closeModal() {
-        if (menuModal) {
-          menuModal.classList.remove('active');
-          updateThemeAndStatusBar();
-        }
-      }
-
-      if (menuBtn) menuBtn.addEventListener('click', openModal);
-      if (settingsBtn) settingsBtn.addEventListener('click', openModal);
-      if (closeModalBtn) closeModalBtn.addEventListener('click', closeModal);
-
-      if (menuModal) {
-        menuModal.addEventListener('click', function(e) {
-          if (e.target === menuModal) {
-            closeModal();
-          }
-        });
-      }
-    })();
-  </script>
 
   <script type="module" src="app.js"></script>
 </body>
