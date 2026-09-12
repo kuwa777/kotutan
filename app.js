@@ -129,6 +129,7 @@ class TakanoriVocabApp {
         this.loadAutoPlaySpeed();
         this.loadSavedStateAndFilters();
         this.attachEventListeners();
+        // タカノリさんが設定された2秒間の心地よいオープニングアニメーションを表示
         const minAnimationPromise = new Promise(resolve => setTimeout(resolve, 2000));
         try {
             await this.dbService.initialize();
@@ -137,16 +138,31 @@ class TakanoriVocabApp {
             loadedWords.sort((a, b) => a.term.localeCompare(b.term, 'en', { sensitivity: 'base' }));
             this.allWords = loadedWords;
             this.applyFilter(true);
+            // 音声データのローカルキャッシュ同期
+            let hasShownProgressBar = false;
             const syncPromise = AudioCacheManager.syncAudioFiles(this.allWords, currentVersionHash, (percent) => {
-                if (this.elAudioProgressContainer) {
-                    if (this.elOpeningSpinner)
-                        this.elOpeningSpinner.style.display = 'none';
-                    this.elAudioProgressContainer.style.display = 'flex';
+                // 【タカノリさんの美学】 100%未満（実際にダウンロードが必要な場合）のみ進捗バーを表示
+                if (percent < 100) {
+                    hasShownProgressBar = true;
+                    if (this.elAudioProgressContainer) {
+                        if (this.elOpeningSpinner)
+                            this.elOpeningSpinner.style.display = 'none';
+                        this.elAudioProgressContainer.style.display = 'flex';
+                        if (this.elAudioProgressText) {
+                            this.elAudioProgressText.textContent = `音声データを準備中... ${percent}%`;
+                        }
+                        if (this.elAudioProgressFill) {
+                            this.elAudioProgressFill.style.width = `${percent}%`;
+                        }
+                    }
+                }
+                else if (hasShownProgressBar && percent === 100) {
+                    // ダウンロード中だった場合のみ、最後に100%を表示して完了させる
                     if (this.elAudioProgressText) {
-                        this.elAudioProgressText.textContent = `音声データを準備中... ${percent}%`;
+                        this.elAudioProgressText.textContent = `準備完了`;
                     }
                     if (this.elAudioProgressFill) {
-                        this.elAudioProgressFill.style.width = `${percent}%`;
+                        this.elAudioProgressFill.style.width = `100%`;
                     }
                 }
             });
