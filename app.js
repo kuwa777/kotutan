@@ -37,6 +37,7 @@ class TakanoriVocabApp {
     autoPlayDirection = 1;
     autoPlayIntervalId = null;
     autoPlaySpeed = 2000;
+    specialAutoPlayActive = false;
     longPressTimer = null;
     STORAGE_LAST_WORD_ID = 'kotutan_last_word_id';
     STORAGE_FILTERS = 'kotutan_selected_filters';
@@ -308,9 +309,9 @@ class TakanoriVocabApp {
     }
     renderEmptyState() {
         if (this.elNumber)
-            this.elNumber.textContent = "No. -";
+            this.elNumber.textContent = "";
         if (this.elTerm)
-            this.elTerm.textContent = "該当単語なし";
+            this.elTerm.textContent = "";
         while (this.elDynamic.firstChild) {
             this.elDynamic.removeChild(this.elDynamic.firstChild);
         }
@@ -582,7 +583,7 @@ class TakanoriVocabApp {
                 const val = parseInt(e.target.value, 10);
                 this.autoPlaySpeed = val;
                 localStorage.setItem('kotutan_autoplay_speed', val.toString());
-                if (this.autoPlayState === 'playing') {
+                if (this.autoPlayState === 'playing' && !this.isSpecialAudioLockMode()) {
                     if (this.autoPlayIntervalId)
                         clearInterval(this.autoPlayIntervalId);
                     this.startProgressBar();
@@ -659,7 +660,11 @@ class TakanoriVocabApp {
             this.elBtnAudio.setAttribute('aria-label', '音声ロック解除');
         }
         this.renderCurrentCard();
-        this.playCurrentSmartAudio();
+        if (this.isSpecialAudioLockMode()) {
+            if (this.autoPlayIntervalId)
+                clearInterval(this.autoPlayIntervalId);
+            this.runSpecialAudioLockAutoPlayLoop();
+        }
     }
     disableAudioLock() {
         this.isAudioLocked = false;
@@ -669,6 +674,9 @@ class TakanoriVocabApp {
             this.elBtnAudio.setAttribute('aria-label', '音声');
         }
         this.renderCurrentCard();
+        if (this.autoPlayState === 'playing' && !this.autoPlayIntervalId) {
+            this.startAutoPlay(this.autoPlayDirection);
+        }
     }
     setupColorSelector(container, onSelect) {
         if (!container)
@@ -809,6 +817,11 @@ class TakanoriVocabApp {
             this.elBtnFlip.setAttribute('aria-label', '反転ロック解除');
         }
         this.renderCurrentCard();
+        if (this.isSpecialAudioLockMode()) {
+            if (this.autoPlayIntervalId)
+                clearInterval(this.autoPlayIntervalId);
+            this.runSpecialAudioLockAutoPlayLoop();
+        }
     }
     disableFlipLock() {
         this.isFlipLocked = false;
@@ -819,6 +832,9 @@ class TakanoriVocabApp {
             this.elBtnFlip.setAttribute('aria-label', '反転');
         }
         this.renderCurrentCard();
+        if (this.autoPlayState === 'playing' && !this.autoPlayIntervalId) {
+            this.startAutoPlay(this.autoPlayDirection);
+        }
     }
     setupLongPressAndClick(btn, direction) {
         btn.addEventListener('pointerdown', () => {
@@ -886,6 +902,16 @@ class TakanoriVocabApp {
         this.elProgressFill.style.transition = `width ${this.autoPlaySpeed}ms linear`;
         this.elProgressFill.style.width = '100%';
     }
+    startProgressBarCustom(durationMs) {
+        if (!this.elProgressContainer || !this.elProgressFill)
+            return;
+        this.elProgressContainer.classList.add('active');
+        this.elProgressFill.style.transition = 'none';
+        this.elProgressFill.style.width = '0%';
+        void this.elProgressFill.offsetWidth;
+        this.elProgressFill.style.transition = `width ${durationMs}ms linear`;
+        this.elProgressFill.style.width = '100%';
+    }
     pauseProgressBar() {
         if (!this.elProgressFill)
             return;
@@ -900,6 +926,46 @@ class TakanoriVocabApp {
         this.elProgressFill.style.transition = 'none';
         this.elProgressFill.style.width = '0%';
     }
+    isSpecialAudioLockMode() {
+        return this.isFlipLocked && this.isAudioLocked && this.autoPlayState === 'playing';
+    }
+    async runSpecialAudioLockAutoPlayLoop() {
+        if (this.specialAutoPlayActive)
+            return;
+        this.specialAutoPlayActive = true;
+        while (this.isSpecialAudioLockMode()) {
+            this.stopProgressBar();
+            await this.playCurrentSmartAudio();
+            if (!this.isSpecialAudioLockMode())
+                break;
+            this.startProgressBarCustom(2000);
+            const waitSuccess = await this.sleepWithCancelCheck(2000);
+            if (!waitSuccess || !this.isSpecialAudioLockMode())
+                break;
+            if (this.autoPlayDirection === 1) {
+                this.nextWord();
+            }
+            else {
+                this.prevWord();
+            }
+        }
+        this.specialAutoPlayActive = false;
+    }
+    sleepWithCancelCheck(ms) {
+        return new Promise((resolve) => {
+            const startTime = Date.now();
+            const checkInterval = setInterval(() => {
+                if (!this.isSpecialAudioLockMode()) {
+                    clearInterval(checkInterval);
+                    resolve(false);
+                }
+                else if (Date.now() - startTime >= ms) {
+                    clearInterval(checkInterval);
+                    resolve(true);
+                }
+            }, 50);
+        });
+    }
     startAutoPlay(direction) {
         this.autoPlayState = 'playing';
         this.autoPlayDirection = direction;
@@ -909,19 +975,24 @@ class TakanoriVocabApp {
         this.updateButtonVisuals();
         if (this.autoPlayIntervalId)
             clearInterval(this.autoPlayIntervalId);
-        if (this.isAudioLocked) {
-            this.playCurrentSmartAudio();
+        if (this.isSpecialAudioLockMode()) {
+            this.runSpecialAudioLockAutoPlayLoop();
         }
-        this.startProgressBar();
-        this.autoPlayIntervalId = window.setInterval(() => {
-            if (!this.isFlipLocked)
-                this.isFlipped = false;
-            if (this.autoPlayDirection === 1)
-                this.nextWord();
-            else
-                this.prevWord();
+        else {
+            if (this.isAudioLocked) {
+                this.playCurrentSmartAudio();
+            }
             this.startProgressBar();
-        }, this.autoPlaySpeed);
+            this.autoPlayIntervalId = window.setInterval(() => {
+                if (!this.isFlipLocked)
+                    this.isFlipped = false;
+                if (this.autoPlayDirection === 1)
+                    this.nextWord();
+                else
+                    this.prevWord();
+                this.startProgressBar();
+            }, this.autoPlaySpeed);
+        }
     }
     pauseAutoPlay() {
         this.autoPlayState = 'paused';
@@ -947,27 +1018,33 @@ class TakanoriVocabApp {
             this.renderCurrentCard();
             this.centerRulerOnCurrentIndex();
         }
-        else {
+        else if (!this.isSpecialAudioLockMode()) {
             if (this.autoPlayDirection === 1)
                 this.nextWord();
             else
                 this.prevWord();
         }
         this.hasMovedWhilePaused = false;
-        this.startProgressBar();
-        this.autoPlayIntervalId = window.setInterval(() => {
-            if (!this.isFlipLocked)
-                this.isFlipped = false;
-            if (this.autoPlayDirection === 1)
-                this.nextWord();
-            else
-                this.prevWord();
+        if (this.isSpecialAudioLockMode()) {
+            this.runSpecialAudioLockAutoPlayLoop();
+        }
+        else {
             this.startProgressBar();
-        }, this.autoPlaySpeed);
+            this.autoPlayIntervalId = window.setInterval(() => {
+                if (!this.isFlipLocked)
+                    this.isFlipped = false;
+                if (this.autoPlayDirection === 1)
+                    this.nextWord();
+                else
+                    this.prevWord();
+                this.startProgressBar();
+            }, this.autoPlaySpeed);
+        }
     }
     stopAutoPlay() {
         this.autoPlayState = 'none';
         this.hasMovedWhilePaused = false;
+        this.specialAutoPlayActive = false;
         if (this.autoPlayIntervalId) {
             clearInterval(this.autoPlayIntervalId);
             this.autoPlayIntervalId = null;
@@ -1310,57 +1387,70 @@ class TakanoriVocabApp {
             this.isFilterDirty = true;
         }
     }
-    async playCurrentSmartAudio() {
-        if (this.displayWords.length === 0)
-            return;
-        const word = this.displayWords[this.currentIndex];
-        let targetFilename = word.audio;
-        if (this.isFlipped && word.example_audio) {
-            targetFilename = word.example_audio;
-        }
-        if (!targetFilename)
-            return;
-        this.stopAudio();
-        const myRequestId = ++this.audioRequestId;
-        let arrayBuffer = null;
-        try {
-            const cachedRes = await caches.match(targetFilename);
-            if (cachedRes) {
-                arrayBuffer = await cachedRes.arrayBuffer();
+    playCurrentSmartAudio() {
+        return new Promise(async (resolve) => {
+            if (this.displayWords.length === 0)
+                return resolve();
+            const word = this.displayWords[this.currentIndex];
+            let targetFilename = word.audio;
+            if (this.isFlipped && word.example_audio) {
+                targetFilename = word.example_audio;
             }
-            else {
-                const fetchRes = await fetch(targetFilename);
-                if (fetchRes.ok) {
-                    arrayBuffer = await fetchRes.arrayBuffer();
+            if (!targetFilename)
+                return resolve();
+            this.stopAudio();
+            const myRequestId = ++this.audioRequestId;
+            let hasResolved = false;
+            const safeResolve = () => {
+                if (!hasResolved) {
+                    hasResolved = true;
+                    resolve();
+                }
+            };
+            let arrayBuffer = null;
+            try {
+                const cachedRes = await caches.match(targetFilename);
+                if (cachedRes) {
+                    arrayBuffer = await cachedRes.arrayBuffer();
+                }
+                else {
+                    const fetchRes = await fetch(targetFilename);
+                    if (fetchRes.ok) {
+                        arrayBuffer = await fetchRes.arrayBuffer();
+                    }
                 }
             }
-        }
-        catch (e) {
-            console.warn(`[Audio] ArrayBuffer 直取得例外 (${targetFilename}):`, e);
-        }
-        if (this.audioRequestId !== myRequestId)
-            return;
-        if (arrayBuffer) {
-            const success = await this.audioEngine.playArrayBuffer(targetFilename, arrayBuffer, myRequestId, () => this.audioRequestId);
-            if (success)
-                return;
-        }
-        if (this.audioRequestId !== myRequestId)
-            return;
-        try {
-            const audio = await AudioCacheManager.getAudioElement(targetFilename);
+            catch (e) {
+                console.warn(`[Audio] ArrayBuffer 直取得例外 (${targetFilename}):`, e);
+            }
             if (this.audioRequestId !== myRequestId)
-                return;
-            if (!audio)
-                return;
-            this.currentAudio = audio;
-            audio.play().catch((err) => {
-                console.warn(`[Audio] フォールバック再生不可 (${targetFilename}):`, err.message);
-            });
-        }
-        catch (e) {
-            console.error(`[Audio] フォールバック致命的エラー (${targetFilename}):`, e);
-        }
+                return safeResolve();
+            if (arrayBuffer) {
+                const success = await this.audioEngine.playArrayBuffer(targetFilename, arrayBuffer, myRequestId, () => this.audioRequestId);
+                if (success) {
+                    safeResolve();
+                    return;
+                }
+            }
+            if (this.audioRequestId !== myRequestId)
+                return safeResolve();
+            try {
+                const audio = await AudioCacheManager.getAudioElement(targetFilename);
+                if (this.audioRequestId !== myRequestId || !audio)
+                    return safeResolve();
+                this.currentAudio = audio;
+                audio.onended = safeResolve;
+                audio.onerror = safeResolve;
+                audio.play().catch((err) => {
+                    console.warn(`[Audio] フォールバック再生不可 (${targetFilename}):`, err.message);
+                    safeResolve();
+                });
+            }
+            catch (e) {
+                console.error(`[Audio] フォールバック致命的エラー (${targetFilename}):`, e);
+                safeResolve();
+            }
+        });
     }
     async loadMasterJsonData(newVersionHash = '1.0.0') {
         try {
