@@ -1,1 +1,121 @@
-import{LIMITS}from"./constants.js";export function decodeCsvBuffer(e){const t=new Uint8Array(e);if(t.length>=3&&239===t[0]&&187===t[1]&&191===t[2])return new TextDecoder("utf-8").decode(t.subarray(3));try{return new TextDecoder("utf-8",{fatal:!0}).decode(t)}catch{return new TextDecoder("shift-jis").decode(t)}}export function parseWordCsv(e){if(!e||"string"!=typeof e)return{words:[],totalCount:0};const t=[];let n=[],r=[],o=!1,s=e.startsWith("\ufeff")?e.slice(1):e;const i=s.length;for(let e=0;e<i;e++){const l=s[e];'"'===l?o&&e+1<i&&'"'===s[e+1]?(r.push('"'),e++):o=!o:","!==l||o?"\r"!==l&&"\n"!==l||o?r.push(l):("\r"===l&&e+1<i&&"\n"===s[e+1]&&e++,n.push(r.join("")),r=[],n.some(e=>e.trim().length>0)&&t.push(n),n=[]):(n.push(r.join("")),r=[])}if((r.length>0||n.length>0)&&(n.push(r.join("")),n.some(e=>e.trim().length>0)&&t.push(n)),0===t.length)return{words:[],totalCount:0};const l=t[0];let c=-1,u=-1,d=-1,h=-1,a=-1,f=0;l.forEach((e,t)=>{const n=e.toLowerCase().trim();(n.includes("単語")||"term"===n||"word"===n)&&(c=t),(n.includes("発音")||n.includes("ipa"))&&(u=t),(n.includes("品詞")||n.includes("pos")||n.includes("partofspeech"))&&(d=t),(n.includes("意味")||n.includes("definition")||n.includes("def"))&&(h=t),(n.includes("例文")||n.includes("example")||n.includes("sentence"))&&(a=t)}),-1===c&&-1===h?(c=0,u=l.length>1?1:-1,d=l.length>2?2:-1,h=l.length>3?3:1,a=l.length>4?4:-1,f=0):f=1;const m=[];for(let e=f;e<t.length;e++){const n=t[e];if(m.length>=LIMITS.MAX_WORDS_PER_IMPORT)break;const r=-1!==c&&n[c]?n[c]:"",o=-1!==u&&n[u]?n[u]:"",s=-1!==d&&n[d]?n[d]:"",i=-1!==h&&n[h]?n[h]:"",l=-1!==a&&n[a]?n[a]:"";(r.trim()||i.trim())&&m.push({term:r.normalize("NFC").trim().slice(0,LIMITS.MAX_WORD_TERM_LENGTH),ipa:o?o.normalize("NFC").trim():"",pos:s?s.normalize("NFC").trim():"",def:i.normalize("NFC").trim().slice(0,LIMITS.MAX_WORD_DEF_LENGTH),example:l?l.normalize("NFC").trim():"",audio:""})}return{words:m,totalCount:m.length}}
+import { LIMITS } from './constants.js';
+export function decodeCsvBuffer(buffer) {
+    const bytes = new Uint8Array(buffer);
+    if (bytes.length >= 3 && bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) {
+        return new TextDecoder('utf-8').decode(bytes.subarray(3));
+    }
+    try {
+        const utf8Decoder = new TextDecoder('utf-8', { fatal: true });
+        return utf8Decoder.decode(bytes);
+    }
+    catch {
+        const sjisDecoder = new TextDecoder('shift-jis');
+        return sjisDecoder.decode(bytes);
+    }
+}
+export function parseWordCsv(csvText) {
+    if (!csvText || typeof csvText !== 'string') {
+        return { words: [], totalCount: 0 };
+    }
+    const rows = [];
+    let currentRow = [];
+    let currentCell = [];
+    let inQuotes = false;
+    let text = csvText.startsWith('\ufeff') ? csvText.slice(1) : csvText;
+    const len = text.length;
+    for (let i = 0; i < len; i++) {
+        const char = text[i];
+        if (char === '"') {
+            if (inQuotes && i + 1 < len && text[i + 1] === '"') {
+                currentCell.push('"');
+                i++;
+            }
+            else {
+                inQuotes = !inQuotes;
+            }
+        }
+        else if (char === ',' && !inQuotes) {
+            currentRow.push(currentCell.join(''));
+            currentCell = [];
+        }
+        else if ((char === '\r' || char === '\n') && !inQuotes) {
+            if (char === '\r' && i + 1 < len && text[i + 1] === '\n') {
+                i++;
+            }
+            currentRow.push(currentCell.join(''));
+            currentCell = [];
+            if (currentRow.some(cell => cell.trim().length > 0)) {
+                rows.push(currentRow);
+            }
+            currentRow = [];
+        }
+        else {
+            currentCell.push(char);
+        }
+    }
+    if (currentCell.length > 0 || currentRow.length > 0) {
+        currentRow.push(currentCell.join(''));
+        if (currentRow.some(cell => cell.trim().length > 0)) {
+            rows.push(currentRow);
+        }
+    }
+    if (rows.length === 0) {
+        return { words: [], totalCount: 0 };
+    }
+    const header = rows[0];
+    let termIdx = -1;
+    let ipaIdx = -1;
+    let posIdx = -1;
+    let defIdx = -1;
+    let exIdx = -1;
+    let startRowIndex = 0;
+    header.forEach((cell, idx) => {
+        const lower = cell.toLowerCase().trim();
+        if (lower.includes('単語') || lower === 'term' || lower === 'word')
+            termIdx = idx;
+        if (lower.includes('発音') || lower.includes('ipa'))
+            ipaIdx = idx;
+        if (lower.includes('品詞') || lower.includes('pos') || lower.includes('partofspeech'))
+            posIdx = idx;
+        if (lower.includes('意味') || lower.includes('definition') || lower.includes('def'))
+            defIdx = idx;
+        if (lower.includes('例文') || lower.includes('example') || lower.includes('sentence'))
+            exIdx = idx;
+    });
+    if (termIdx === -1 && defIdx === -1) {
+        termIdx = 0;
+        ipaIdx = header.length > 1 ? 1 : -1;
+        posIdx = header.length > 2 ? 2 : -1;
+        defIdx = header.length > 3 ? 3 : 1;
+        exIdx = header.length > 4 ? 4 : -1;
+        startRowIndex = 0;
+    }
+    else {
+        startRowIndex = 1;
+    }
+    const parsedWords = [];
+    for (let i = startRowIndex; i < rows.length; i++) {
+        const row = rows[i];
+        if (parsedWords.length >= LIMITS.MAX_WORDS_PER_IMPORT)
+            break;
+        const rawTerm = termIdx !== -1 && row[termIdx] ? row[termIdx] : '';
+        const rawIpa = ipaIdx !== -1 && row[ipaIdx] ? row[ipaIdx] : '';
+        const rawPos = posIdx !== -1 && row[posIdx] ? row[posIdx] : '';
+        const rawDef = defIdx !== -1 && row[defIdx] ? row[defIdx] : '';
+        const rawEx = exIdx !== -1 && row[exIdx] ? row[exIdx] : '';
+        if (!rawTerm.trim() && !rawDef.trim())
+            continue;
+        parsedWords.push({
+            term: rawTerm.normalize('NFC').trim().slice(0, LIMITS.MAX_WORD_TERM_LENGTH),
+            ipa: rawIpa ? rawIpa.normalize('NFC').trim() : '',
+            pos: rawPos ? rawPos.normalize('NFC').trim() : '',
+            def: rawDef.normalize('NFC').trim().slice(0, LIMITS.MAX_WORD_DEF_LENGTH),
+            example: rawEx ? rawEx.normalize('NFC').trim() : '',
+            audio: '',
+        });
+    }
+    return {
+        words: parsedWords,
+        totalCount: parsedWords.length,
+    };
+}

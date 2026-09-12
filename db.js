@@ -1,1 +1,251 @@
-import{DB_NAME,DB_VERSION,STORE_WORDS_A,STORE_WORDS_B,STORE_META,LOCK_NAME_DB_SWAP}from"./constants.js";const STORE_USER_DATA="user_personal_data",LOCALSTORAGE_BACKUP_KEY="kotutan_user_states_backup";export class DatabaseService{db=null;async initialize(){if(!this.db)return new Promise((e,t)=>{const o=indexedDB.open(DB_NAME,DB_VERSION);o.onupgradeneeded=e=>{const t=o.result;t.objectStoreNames.contains(STORE_WORDS_A)||t.createObjectStore(STORE_WORDS_A,{keyPath:"id"}),t.objectStoreNames.contains(STORE_WORDS_B)||t.createObjectStore(STORE_WORDS_B,{keyPath:"id"}),t.objectStoreNames.contains(STORE_USER_DATA)||t.createObjectStore(STORE_USER_DATA,{keyPath:"wordId"}),t.objectStoreNames.contains(STORE_META)||t.createObjectStore(STORE_META,{keyPath:"id"})},o.onsuccess=()=>{this.db=o.result,this.db.onversionchange=()=>{this.db&&(this.db.close(),this.db=null,window.location.reload())},this.ensureMetaInitialized().then(e).catch(t)},o.onerror=()=>{t(new Error(`[DatabaseService] DBオープン失敗: ${o.error?.message}`))}})}async ensureMetaInitialized(){if(!await this.getAppMeta()){const e={id:"system_meta",activeStore:"A",dataVersion:"1.0.0",lastUpdated:Date.now()};await this.saveAppMeta(e)}}getDb(){if(!this.db)throw new Error("[DatabaseService] DB未初期化");return this.db}async getAppMeta(){const e=this.getDb();return new Promise((t,o)=>{const r=e.transaction(STORE_META,"readonly").objectStore(STORE_META).get("system_meta");r.onsuccess=()=>t(r.result||null),r.onerror=()=>o(r.error)})}async saveAppMeta(e){const t=this.getDb();return new Promise((o,r)=>{const s=t.transaction(STORE_META,"readwrite"),a=s.objectStore(STORE_META).put(e);s.oncomplete=()=>o(),s.onerror=()=>r(a.error)})}async getActiveStoreName(){const e=await this.getAppMeta();return"B"===e?.activeStore?STORE_WORDS_B:STORE_WORDS_A}async getInactiveStoreName(){const e=await this.getAppMeta();return"B"===e?.activeStore?STORE_WORDS_A:STORE_WORDS_B}async getAllCombinedWords(){const e=await this.getActiveStoreName(),t=this.getDb(),o=await new Promise((o,r)=>{const s=t.transaction(e,"readonly").objectStore(e).getAll();s.onsuccess=()=>o(s.result||[]),s.onerror=()=>r(s.error)});let r=await new Promise((e,o)=>{const r=t.transaction(STORE_USER_DATA,"readonly").objectStore(STORE_USER_DATA).getAll();r.onsuccess=()=>e(r.result||[]),r.onerror=()=>o(r.error)});if(0===r.length){const e=localStorage.getItem(LOCALSTORAGE_BACKUP_KEY);if(e)try{const o=JSON.parse(e);r=Object.values(o);const s=t.transaction(STORE_USER_DATA,"readwrite").objectStore(STORE_USER_DATA);for(const e of r)s.put(e);console.log("[Pの防壁] localStorage から IndexedDB へ個人データを自動復元いたしました！")}catch(e){console.warn("[Pの防壁] バックアップの復元に失敗しました:",e)}}const s=new Map;for(const e of r)s.set(e.wordId,e);return o.map(e=>{const t=s.get(e.id);return{...e,groupColor:t?t.groupColor:null,isFavorite:!!t&&!!t.isFavorite,isMemorized:!!t&&!!t.isMemorized}})}async updateUserState(e,t){const o=this.getDb();try{const o=localStorage.getItem(LOCALSTORAGE_BACKUP_KEY),r=o?JSON.parse(o):{},s=r[e],a={wordId:e,groupColor:void 0!==t.groupColor?t.groupColor:s?.groupColor||null,isFavorite:void 0!==t.isFavorite?t.isFavorite:s?.isFavorite||!1,isMemorized:void 0!==t.isMemorized?t.isMemorized:s?.isMemorized||!1,lastReviewedAt:void 0!==t.lastReviewedAt?t.lastReviewedAt:s?.lastReviewedAt||Date.now()};r[e]=a,localStorage.setItem(LOCALSTORAGE_BACKUP_KEY,JSON.stringify(r))}catch(e){console.warn("[Pの防壁] localStorage への保存スキップ:",e)}return new Promise((r,s)=>{const a=o.transaction(STORE_USER_DATA,"readwrite"),i=a.objectStore(STORE_USER_DATA),n=i.get(e);n.onsuccess=()=>{const o=n.result,r={wordId:e,groupColor:void 0!==t.groupColor?t.groupColor:o?.groupColor||null,isFavorite:void 0!==t.isFavorite?t.isFavorite:o?.isFavorite||!1,isMemorized:void 0!==t.isMemorized?t.isMemorized:o?.isMemorized||!1,lastReviewedAt:void 0!==t.lastReviewedAt?t.lastReviewedAt:o?.lastReviewedAt||Date.now()};i.put(r)},a.oncomplete=()=>r(),a.onerror=()=>s(a.error||new Error("[DatabaseService] トランザクションエラー")),a.onabort=()=>s(new Error("[DatabaseService] トランザクション中断"))})}async bulkUpdateUserStates(e){if(!this.db||0===e.length)return;const t=Date.now();try{const o=localStorage.getItem(LOCALSTORAGE_BACKUP_KEY),r=o?JSON.parse(o):{};for(const o of e){const e=String(o.id),s=r[e];r[e]={wordId:e,groupColor:o.groupColor,isFavorite:s?.isFavorite||!1,isMemorized:s?.isMemorized||!1,lastReviewedAt:t}}localStorage.setItem(LOCALSTORAGE_BACKUP_KEY,JSON.stringify(r))}catch(e){console.warn("[Pの防壁] localStorage 一括保存スキップ:",e)}return new Promise((o,r)=>{const s=this.db.transaction(STORE_USER_DATA,"readwrite"),a=s.objectStore(STORE_USER_DATA);s.oncomplete=()=>o(),s.onerror=()=>r(s.error||new Error("[DatabaseService] 一括トランザクションエラー")),s.onabort=()=>r(new Error("[DatabaseService] 一括トランザクション中断"));for(const o of e){const e=String(o.id),r=a.get(e);r.onsuccess=()=>{const s=r.result,i={wordId:e,groupColor:o.groupColor,isFavorite:s?.isFavorite||!1,isMemorized:s?.isMemorized||!1,lastReviewedAt:t};a.put(i)}}})}async syncMasterWordsAtomic(e,t){const o=async()=>{const o=this.getDb(),r=await this.getInactiveStoreName(),s=await this.getAppMeta();await new Promise((t,s)=>{const a=o.transaction(r,"readwrite"),i=a.objectStore(r);i.clear();for(const t of e)i.put(t);a.oncomplete=()=>t(),a.onerror=()=>s(a.error)});const a="B"===s?.activeStore?"A":"B";await this.saveAppMeta({id:"system_meta",activeStore:a,dataVersion:t,lastUpdated:Date.now()})};if("locks"in navigator)return navigator.locks.request(LOCK_NAME_DB_SWAP,o);await o()}}
+import { DB_NAME, DB_VERSION, STORE_WORDS_A, STORE_WORDS_B, STORE_META, LOCK_NAME_DB_SWAP, } from './constants.js';
+const STORE_USER_DATA = 'user_personal_data';
+const LOCALSTORAGE_BACKUP_KEY = 'kotutan_user_states_backup';
+export class DatabaseService {
+    db = null;
+    async initialize() {
+        if (this.db)
+            return;
+        return new Promise((resolve, reject) => {
+            const request = indexedDB.open(DB_NAME, DB_VERSION);
+            request.onupgradeneeded = (event) => {
+                const db = request.result;
+                if (!db.objectStoreNames.contains(STORE_WORDS_A)) {
+                    db.createObjectStore(STORE_WORDS_A, { keyPath: 'id' });
+                }
+                if (!db.objectStoreNames.contains(STORE_WORDS_B)) {
+                    db.createObjectStore(STORE_WORDS_B, { keyPath: 'id' });
+                }
+                if (!db.objectStoreNames.contains(STORE_USER_DATA)) {
+                    db.createObjectStore(STORE_USER_DATA, { keyPath: 'wordId' });
+                }
+                if (!db.objectStoreNames.contains(STORE_META)) {
+                    db.createObjectStore(STORE_META, { keyPath: 'id' });
+                }
+            };
+            request.onsuccess = () => {
+                this.db = request.result;
+                this.db.onversionchange = () => {
+                    if (this.db) {
+                        this.db.close();
+                        this.db = null;
+                        window.location.reload();
+                    }
+                };
+                this.ensureMetaInitialized().then(resolve).catch(reject);
+            };
+            request.onerror = () => {
+                reject(new Error(`[DatabaseService] DBオープン失敗: ${request.error?.message}`));
+            };
+        });
+    }
+    async ensureMetaInitialized() {
+        const meta = await this.getAppMeta();
+        if (!meta) {
+            const defaultMeta = {
+                id: 'system_meta',
+                activeStore: 'A',
+                dataVersion: '1.0.0',
+                lastUpdated: Date.now(),
+            };
+            await this.saveAppMeta(defaultMeta);
+        }
+    }
+    getDb() {
+        if (!this.db)
+            throw new Error('[DatabaseService] DB未初期化');
+        return this.db;
+    }
+    async getAppMeta() {
+        const db = this.getDb();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(STORE_META, 'readonly');
+            const store = tx.objectStore(STORE_META);
+            const request = store.get('system_meta');
+            request.onsuccess = () => resolve(request.result || null);
+            request.onerror = () => reject(request.error);
+        });
+    }
+    async saveAppMeta(meta) {
+        const db = this.getDb();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(STORE_META, 'readwrite');
+            const store = tx.objectStore(STORE_META);
+            const request = store.put(meta);
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(request.error);
+        });
+    }
+    async getActiveStoreName() {
+        const meta = await this.getAppMeta();
+        return meta?.activeStore === 'B' ? STORE_WORDS_B : STORE_WORDS_A;
+    }
+    async getInactiveStoreName() {
+        const meta = await this.getAppMeta();
+        return meta?.activeStore === 'B' ? STORE_WORDS_A : STORE_WORDS_B;
+    }
+    async getAllCombinedWords() {
+        const storeName = await this.getActiveStoreName();
+        const db = this.getDb();
+        const masterWords = await new Promise((resolve, reject) => {
+            const tx = db.transaction(storeName, 'readonly');
+            const store = tx.objectStore(storeName);
+            const request = store.getAll();
+            request.onsuccess = () => resolve(request.result || []);
+            request.onerror = () => reject(request.error);
+        });
+        let userStates = await new Promise((resolve, reject) => {
+            const tx = db.transaction(STORE_USER_DATA, 'readonly');
+            const store = tx.objectStore(STORE_USER_DATA);
+            const request = store.getAll();
+            request.onsuccess = () => resolve(request.result || []);
+            request.onerror = () => reject(request.error);
+        });
+        if (userStates.length === 0) {
+            const backupJson = localStorage.getItem(LOCALSTORAGE_BACKUP_KEY);
+            if (backupJson) {
+                try {
+                    const backupMap = JSON.parse(backupJson);
+                    userStates = Object.values(backupMap);
+                    const tx = db.transaction(STORE_USER_DATA, 'readwrite');
+                    const store = tx.objectStore(STORE_USER_DATA);
+                    for (const state of userStates) {
+                        store.put(state);
+                    }
+                    console.log('[Pの防壁] localStorage から IndexedDB へ個人データを自動復元いたしました！');
+                }
+                catch (e) {
+                    console.warn('[Pの防壁] バックアップの復元に失敗しました:', e);
+                }
+            }
+        }
+        const userStateMap = new Map();
+        for (const state of userStates) {
+            userStateMap.set(state.wordId, state);
+        }
+        return masterWords.map((master) => {
+            const state = userStateMap.get(master.id);
+            return {
+                ...master,
+                groupColor: state ? state.groupColor : null,
+                isFavorite: state ? !!state.isFavorite : false,
+                isMemorized: state ? !!state.isMemorized : false,
+            };
+        });
+    }
+    async updateUserState(wordId, updates) {
+        const db = this.getDb();
+        try {
+            const backupJson = localStorage.getItem(LOCALSTORAGE_BACKUP_KEY);
+            const backupMap = backupJson ? JSON.parse(backupJson) : {};
+            const currentState = backupMap[wordId];
+            const newState = {
+                wordId,
+                groupColor: updates.groupColor !== undefined ? updates.groupColor : (currentState?.groupColor || null),
+                isFavorite: updates.isFavorite !== undefined ? updates.isFavorite : (currentState?.isFavorite || false),
+                isMemorized: updates.isMemorized !== undefined ? updates.isMemorized : (currentState?.isMemorized || false),
+                lastReviewedAt: updates.lastReviewedAt !== undefined ? updates.lastReviewedAt : (currentState?.lastReviewedAt || Date.now()),
+            };
+            backupMap[wordId] = newState;
+            localStorage.setItem(LOCALSTORAGE_BACKUP_KEY, JSON.stringify(backupMap));
+        }
+        catch (e) {
+            console.warn('[Pの防壁] localStorage への保存スキップ:', e);
+        }
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(STORE_USER_DATA, 'readwrite');
+            const store = tx.objectStore(STORE_USER_DATA);
+            const getRequest = store.get(wordId);
+            getRequest.onsuccess = () => {
+                const currentState = getRequest.result;
+                const newState = {
+                    wordId,
+                    groupColor: updates.groupColor !== undefined ? updates.groupColor : (currentState?.groupColor || null),
+                    isFavorite: updates.isFavorite !== undefined ? updates.isFavorite : (currentState?.isFavorite || false),
+                    isMemorized: updates.isMemorized !== undefined ? updates.isMemorized : (currentState?.isMemorized || false),
+                    lastReviewedAt: updates.lastReviewedAt !== undefined ? updates.lastReviewedAt : (currentState?.lastReviewedAt || Date.now()),
+                };
+                store.put(newState);
+            };
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error || new Error(`[DatabaseService] トランザクションエラー`));
+            tx.onabort = () => reject(new Error(`[DatabaseService] トランザクション中断`));
+        });
+    }
+    async bulkUpdateUserStates(updates) {
+        if (!this.db || updates.length === 0)
+            return;
+        const now = Date.now();
+        try {
+            const backupJson = localStorage.getItem(LOCALSTORAGE_BACKUP_KEY);
+            const backupMap = backupJson ? JSON.parse(backupJson) : {};
+            for (const item of updates) {
+                const key = String(item.id);
+                const currentState = backupMap[key];
+                backupMap[key] = {
+                    wordId: key,
+                    groupColor: item.groupColor,
+                    isFavorite: currentState?.isFavorite || false,
+                    isMemorized: currentState?.isMemorized || false,
+                    lastReviewedAt: now,
+                };
+            }
+            localStorage.setItem(LOCALSTORAGE_BACKUP_KEY, JSON.stringify(backupMap));
+        }
+        catch (e) {
+            console.warn('[Pの防壁] localStorage 一括保存スキップ:', e);
+        }
+        return new Promise((resolve, reject) => {
+            const tx = this.db.transaction(STORE_USER_DATA, 'readwrite');
+            const store = tx.objectStore(STORE_USER_DATA);
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error || new Error('[DatabaseService] 一括トランザクションエラー'));
+            tx.onabort = () => reject(new Error('[DatabaseService] 一括トランザクション中断'));
+            for (const item of updates) {
+                const key = String(item.id);
+                const req = store.get(key);
+                req.onsuccess = () => {
+                    const currentState = req.result;
+                    const newState = {
+                        wordId: key,
+                        groupColor: item.groupColor,
+                        isFavorite: currentState?.isFavorite || false,
+                        isMemorized: currentState?.isMemorized || false,
+                        lastReviewedAt: now,
+                    };
+                    store.put(newState);
+                };
+            }
+        });
+    }
+    async syncMasterWordsAtomic(masterWords, newVersion) {
+        const execute = async () => {
+            const db = this.getDb();
+            const inactiveStore = await this.getInactiveStoreName();
+            const currentMeta = await this.getAppMeta();
+            await new Promise((resolve, reject) => {
+                const tx = db.transaction(inactiveStore, 'readwrite');
+                const store = tx.objectStore(inactiveStore);
+                store.clear();
+                for (const w of masterWords) {
+                    store.put(w);
+                }
+                tx.oncomplete = () => resolve();
+                tx.onerror = () => reject(tx.error);
+            });
+            const newActive = currentMeta?.activeStore === 'B' ? 'A' : 'B';
+            await this.saveAppMeta({
+                id: 'system_meta',
+                activeStore: newActive,
+                dataVersion: newVersion,
+                lastUpdated: Date.now(),
+            });
+        };
+        if ('locks' in navigator) {
+            return navigator.locks.request(LOCK_NAME_DB_SWAP, execute);
+        }
+        else {
+            await execute();
+        }
+    }
+}

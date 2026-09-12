@@ -1,1 +1,123 @@
-"use strict";const CACHE_PREFIX="takanori-vocab-v",CURRENT_CACHE_VERSION="1.0.20260912-194357",ACTIVE_CACHE_NAME=`${CACHE_PREFIX}1.0.20260912-194357`,swSelf=self,INITIAL_CACHED_RESOURCES=["./","./index.html","./app.css","./app.js","./constants.js","./types.js","./db.js","./csvParser.js","./updateManager.js","./sw.js","./words_master.json","./images/logo.png","./icons/icon-192.png","./icons/icon-512.png"];swSelf.addEventListener("install",e=>{swSelf.skipWaiting(),e.waitUntil((async()=>{try{const e=await caches.open(ACTIVE_CACHE_NAME);await Promise.allSettled(INITIAL_CACHED_RESOURCES.map(async t=>{try{await e.add(t)}catch(e){console.warn(`[ServiceWorker] アセット個別の事前キャッシュスキップ: ${t}`)}})),console.debug(`[ServiceWorker] バージョン ${ACTIVE_CACHE_NAME} のインストールとキャッシュ完了`)}catch(e){console.error("[ServiceWorker] キャッシュの初期化に失敗しました:",e)}})())}),swSelf.addEventListener("activate",e=>{e.waitUntil((async()=>{try{const e=(await caches.keys()).map(e=>e.startsWith(CACHE_PREFIX)&&e!==ACTIVE_CACHE_NAME?(console.debug(`[ServiceWorker] 古いキャッシュ ${e} をパージします`),caches.delete(e)):Promise.resolve(!1));await Promise.all(e),await swSelf.clients.claim(),console.debug(`[ServiceWorker] ${ACTIVE_CACHE_NAME} がアクティブになり、制御権を奪取しました`)}catch(e){console.error("[ServiceWorker] アクティベート時のクリーンアップに失敗しました:",e)}})())}),swSelf.addEventListener("fetch",e=>{const t=e.request,s=new URL(t.url);if("GET"!==t.method||!s.protocol.startsWith("http"))return;if(t.headers.has("range"))return;if(s.pathname.endsWith("manifest.webmanifest")||s.pathname.endsWith("version.json")||s.pathname.endsWith("sw.js"))return;"navigate"===t.mode?e.respondWith((async()=>{try{const e=await fetch(t);if(e&&200===e.status){return(await caches.open(ACTIVE_CACHE_NAME)).put(t,e.clone()),e}}catch(e){console.warn("[ServiceWorker] ネットワーク取得失敗。キャッシュから起動します:",t.url)}const e=await caches.match(t);if(e)return e;const s=await caches.open(ACTIVE_CACHE_NAME),a=await s.match("./index.html")||await s.match("./");return a||new Response("",{status:408})})()):e.respondWith((async()=>{try{const e=await caches.match(t);if(e)return e;const s=await fetch(t);if(s&&200===s.status&&"basic"===s.type){(await caches.open(ACTIVE_CACHE_NAME)).put(t,s.clone())}return s}catch(e){return console.error("[ServiceWorker] ネットワーク取得失敗:",t.url),new Response("",{status:408})}})())});
+"use strict";
+const CACHE_PREFIX = 'takanori-vocab-v';
+const CURRENT_CACHE_VERSION = '@@@';
+const ACTIVE_CACHE_NAME = `${CACHE_PREFIX}${CURRENT_CACHE_VERSION}`;
+const swSelf = self;
+const INITIAL_CACHED_RESOURCES = [
+    './',
+    './index.html',
+    './app.css',
+    './app.js',
+    './constants.js',
+    './types.js',
+    './db.js',
+    './csvParser.js',
+    './updateManager.js',
+    './sw.js',
+    './words_master.json',
+    './images/logo.png',
+    './icons/icon-192.png',
+    './icons/icon-512.png'
+];
+swSelf.addEventListener('install', (event) => {
+    swSelf.skipWaiting();
+    event.waitUntil((async () => {
+        try {
+            const cache = await caches.open(ACTIVE_CACHE_NAME);
+            await Promise.allSettled(INITIAL_CACHED_RESOURCES.map(async (resource) => {
+                try {
+                    await cache.add(resource);
+                }
+                catch (e) {
+                    console.warn(`[ServiceWorker] アセット個別の事前キャッシュスキップ: ${resource}`);
+                }
+            }));
+            console.debug(`[ServiceWorker] バージョン ${ACTIVE_CACHE_NAME} のインストールとキャッシュ完了`);
+        }
+        catch (error) {
+            console.error('[ServiceWorker] キャッシュの初期化に失敗しました:', error);
+        }
+    })());
+});
+swSelf.addEventListener('activate', (event) => {
+    event.waitUntil((async () => {
+        try {
+            const cacheKeys = await caches.keys();
+            const deletePromises = cacheKeys.map((key) => {
+                if (key.startsWith(CACHE_PREFIX) && key !== ACTIVE_CACHE_NAME) {
+                    console.debug(`[ServiceWorker] 古いキャッシュ ${key} をパージします`);
+                    return caches.delete(key);
+                }
+                return Promise.resolve(false);
+            });
+            await Promise.all(deletePromises);
+            await swSelf.clients.claim();
+            console.debug(`[ServiceWorker] ${ACTIVE_CACHE_NAME} がアクティブになり、制御権を奪取しました`);
+        }
+        catch (error) {
+            console.error('[ServiceWorker] アクティベート時のクリーンアップに失敗しました:', error);
+        }
+    })());
+});
+swSelf.addEventListener('fetch', (event) => {
+    const request = event.request;
+    const url = new URL(request.url);
+    if (request.method !== 'GET' || !url.protocol.startsWith('http')) {
+        return;
+    }
+    if (request.headers.has('range')) {
+        return;
+    }
+    if (url.pathname.endsWith('manifest.webmanifest') ||
+        url.pathname.endsWith('version.json') ||
+        url.pathname.endsWith('sw.js')) {
+        return;
+    }
+    const isNavigation = request.mode === 'navigate';
+    if (isNavigation) {
+        event.respondWith((async () => {
+            try {
+                const networkResponse = await fetch(request);
+                if (networkResponse && networkResponse.status === 200) {
+                    const cache = await caches.open(ACTIVE_CACHE_NAME);
+                    cache.put(request, networkResponse.clone());
+                    return networkResponse;
+                }
+            }
+            catch (e) {
+                console.warn('[ServiceWorker] ネットワーク取得失敗。キャッシュから起動します:', request.url);
+            }
+            const cachedResponse = await caches.match(request);
+            if (cachedResponse) {
+                return cachedResponse;
+            }
+            const cache = await caches.open(ACTIVE_CACHE_NAME);
+            const fallback = await cache.match('./index.html') || await cache.match('./');
+            if (fallback) {
+                return fallback;
+            }
+            return new Response('', { status: 408 });
+        })());
+        return;
+    }
+    event.respondWith((async () => {
+        try {
+            const cachedResponse = await caches.match(request);
+            if (cachedResponse) {
+                return cachedResponse;
+            }
+            const networkResponse = await fetch(request);
+            if (networkResponse &&
+                networkResponse.status === 200 &&
+                networkResponse.type === 'basic') {
+                const cache = await caches.open(ACTIVE_CACHE_NAME);
+                cache.put(request, networkResponse.clone());
+            }
+            return networkResponse;
+        }
+        catch (error) {
+            console.error('[ServiceWorker] ネットワーク取得失敗:', request.url);
+            return new Response('', { status: 408 });
+        }
+    })());
+});

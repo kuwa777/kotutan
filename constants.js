@@ -1,1 +1,17 @@
-export const DB_NAME="takanori_vocab_db";export const DB_VERSION=1;export const STORE_WORDS_A="words_master_a";export const STORE_WORDS_B="words_master_b";export const STORE_GROUPS="groups";export const STORE_META="app_meta";export const LOCK_NAME_DB_SWAP="vocab_db_atomic_swap_lock";export const LIMITS={MAX_WORD_TERM_LENGTH:200,MAX_WORD_DEF_LENGTH:2e3,MAX_GROUP_NAME_LENGTH:50,MAX_WORDS_PER_IMPORT:5e4,MAX_FILE_SIZE_BYTES:10485760};export const CACHE_PREFIX="takanori-vocab-v";export const CURRENT_CACHE_VERSION="1.0.0";export const ACTIVE_CACHE_NAME=`${CACHE_PREFIX}1.0.0`;
+export const DB_NAME = 'takanori_vocab_db';
+export const DB_VERSION = 1;
+export const STORE_WORDS_A = 'words_master_a';
+export const STORE_WORDS_B = 'words_master_b';
+export const STORE_GROUPS = 'groups';
+export const STORE_META = 'app_meta';
+export const LOCK_NAME_DB_SWAP = 'vocab_db_atomic_swap_lock';
+export const LIMITS = {
+    MAX_WORD_TERM_LENGTH: 200,
+    MAX_WORD_DEF_LENGTH: 2000,
+    MAX_GROUP_NAME_LENGTH: 50,
+    MAX_WORDS_PER_IMPORT: 50000,
+    MAX_FILE_SIZE_BYTES: 10 * 1024 * 1024,
+};
+export const CACHE_PREFIX = 'takanori-vocab-v';
+export const CURRENT_CACHE_VERSION = '1.0.0';
+export const ACTIVE_CACHE_NAME = `${CACHE_PREFIX}${CURRENT_CACHE_VERSION}`;

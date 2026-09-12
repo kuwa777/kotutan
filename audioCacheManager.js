@@ -1,1 +1,147 @@
-const CACHE_NAME="kotutan-audio-v1",CHUNKS_STORAGE_KEY="kotutan_audio_chunks_a1",FETCH_TIMEOUT_MS=15e3;function getMimeType(e){const t=e.split(".").pop()?.toLowerCase();switch(t){case"m4a":case"mp4":return"audio/mp4";case"wav":return"audio/wav";case"ogg":return"audio/ogg";case"aac":return"audio/aac";default:return"audio/mpeg"}}export class AudioCacheManager{static async syncAudioFiles(e,t,a){if("caches"in window&&"Worker"in window)try{const e=await caches.open(CACHE_NAME),t=await fetch(`audio/chunks_info.json?t=${Date.now()}`);if(!t.ok)return;const n=await t.json();if(!Array.isArray(n)||0===n.length)return;const o=n.reduce((e,t)=>e+(t.size||0),0);if(0===o)return;let r={};const i=localStorage.getItem(CHUNKS_STORAGE_KEY);if(i)try{r=JSON.parse(i)||{}}catch(e){}let s=n.filter(e=>r[e.name]).reduce((e,t)=>e+t.size,0);const c=n.filter(e=>!r[e.name]);if(0===c.length)return void(a&&a(100));let u=0;const d=e=>{if(!a)return;const t=Math.max(u,Math.min(99,e));u=t,a(t)};d(Math.floor(s/o*100));const f=new Worker("audioUnzipWorker.js");try{for(const t of c)try{const a=new AbortController,n=setTimeout(()=>a.abort(),15e3),i=await fetch(`audio/${t.name}`,{signal:a.signal});if(clearTimeout(n),!i.ok)continue;let c=s+Math.floor(.5*t.size);d(Math.floor(c/o*100));const u=await i.arrayBuffer(),m=await new Promise(e=>{let a;const n=o=>{o.data.chunkName===t.name&&(clearTimeout(a),f.removeEventListener("message",n),e(o.data))};a=window.setTimeout(()=>{f.removeEventListener("message",n),e({chunkName:t.name,success:!1,error:"解凍タイムアウト"})},1e4),f.addEventListener("message",n),f.postMessage({chunkName:t.name,buffer:u},[u])});if(m.success&&m.files){for(const t of m.files){const a=`audio/${t.filename}`,n=getMimeType(t.filename),o=new Response(t.buffer,{headers:{"Content-Type":n}});await e.put(a,o)}r[t.name]=!0,localStorage.setItem(CHUNKS_STORAGE_KEY,JSON.stringify(r)),s+=t.size,d(Math.floor(s/o*100))}}catch(e){console.warn(`[AudioCache] チャンク処理スキップ (${t.name}):`,e)}a&&a(100)}finally{f.terminate()}}catch(e){console.error("[AudioCache] チャンク同期例外:",e)}}static async getAudioElement(e){const t=`audio/${e}`;try{if("caches"in window){const e=await caches.open(CACHE_NAME),a=await e.match(t);if(a){const e=await a.blob(),t=URL.createObjectURL(e),n=new Audio(t),o=()=>{URL.revokeObjectURL(t),n.removeEventListener("ended",o),n.removeEventListener("error",o)};return n.addEventListener("ended",o),n.addEventListener("error",o),n}}}catch(e){}return new Audio(t)}}
+const CACHE_NAME = 'kotutan-audio-v1';
+const CHUNKS_STORAGE_KEY = 'kotutan_audio_chunks_a1';
+const FETCH_TIMEOUT_MS = 15000;
+function getMimeType(filename) {
+    const ext = filename.split('.').pop()?.toLowerCase();
+    switch (ext) {
+        case 'm4a':
+        case 'mp4':
+            return 'audio/mp4';
+        case 'wav':
+            return 'audio/wav';
+        case 'ogg':
+            return 'audio/ogg';
+        case 'aac':
+            return 'audio/aac';
+        case 'mp3':
+        default:
+            return 'audio/mpeg';
+    }
+}
+export class AudioCacheManager {
+    static async syncAudioFiles(words, currentVersion, onProgress) {
+        if (!('caches' in window) || !('Worker' in window))
+            return;
+        try {
+            const cache = await caches.open(CACHE_NAME);
+            const infoRes = await fetch(`audio/chunks_info.json?t=${Date.now()}`);
+            if (!infoRes.ok)
+                return;
+            const chunks = await infoRes.json();
+            if (!Array.isArray(chunks) || chunks.length === 0)
+                return;
+            const totalBytes = chunks.reduce((sum, c) => sum + (c.size || 0), 0);
+            if (totalBytes === 0)
+                return;
+            let completedChunksMap = {};
+            const savedMap = localStorage.getItem(CHUNKS_STORAGE_KEY);
+            if (savedMap) {
+                try {
+                    completedChunksMap = JSON.parse(savedMap) || {};
+                }
+                catch (e) { }
+            }
+            let currentCompletedBytes = chunks
+                .filter(c => completedChunksMap[c.name])
+                .reduce((sum, c) => sum + c.size, 0);
+            const pendingChunks = chunks.filter(c => !completedChunksMap[c.name]);
+            if (pendingChunks.length === 0) {
+                if (onProgress)
+                    onProgress(100);
+                return;
+            }
+            let lastReportedPercent = 0;
+            const reportProgress = (calculatedPercent) => {
+                if (!onProgress)
+                    return;
+                const safePercent = Math.max(lastReportedPercent, Math.min(99, calculatedPercent));
+                lastReportedPercent = safePercent;
+                onProgress(safePercent);
+            };
+            const initialPercent = Math.floor((currentCompletedBytes / totalBytes) * 100);
+            reportProgress(initialPercent);
+            const worker = new Worker('audioUnzipWorker.js');
+            try {
+                for (const chunk of pendingChunks) {
+                    try {
+                        const controller = new AbortController();
+                        const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+                        const res = await fetch(`audio/${chunk.name}`, { signal: controller.signal });
+                        clearTimeout(timeoutId);
+                        if (!res.ok)
+                            continue;
+                        const downloadWeightBytes = Math.floor(chunk.size * 0.5);
+                        let interimBytes = currentCompletedBytes + downloadWeightBytes;
+                        reportProgress(Math.floor((interimBytes / totalBytes) * 100));
+                        const zipBuffer = await res.arrayBuffer();
+                        const unzipResult = await new Promise((resolve) => {
+                            let workerTimeoutId;
+                            const handleMessage = (e) => {
+                                if (e.data.chunkName === chunk.name) {
+                                    clearTimeout(workerTimeoutId);
+                                    worker.removeEventListener('message', handleMessage);
+                                    resolve(e.data);
+                                }
+                            };
+                            workerTimeoutId = window.setTimeout(() => {
+                                worker.removeEventListener('message', handleMessage);
+                                resolve({ chunkName: chunk.name, success: false, error: '解凍タイムアウト' });
+                            }, 10000);
+                            worker.addEventListener('message', handleMessage);
+                            worker.postMessage({ chunkName: chunk.name, buffer: zipBuffer }, [zipBuffer]);
+                        });
+                        if (unzipResult.success && unzipResult.files) {
+                            for (const file of unzipResult.files) {
+                                const audioUrl = `audio/${file.filename}`;
+                                const mimeType = getMimeType(file.filename);
+                                const response = new Response(file.buffer, {
+                                    headers: { 'Content-Type': mimeType }
+                                });
+                                await cache.put(audioUrl, response);
+                            }
+                            completedChunksMap[chunk.name] = true;
+                            localStorage.setItem(CHUNKS_STORAGE_KEY, JSON.stringify(completedChunksMap));
+                            currentCompletedBytes += chunk.size;
+                            reportProgress(Math.floor((currentCompletedBytes / totalBytes) * 100));
+                        }
+                    }
+                    catch (e) {
+                        console.warn(`[AudioCache] チャンク処理スキップ (${chunk.name}):`, e);
+                    }
+                }
+                if (onProgress)
+                    onProgress(100);
+            }
+            finally {
+                worker.terminate();
+            }
+        }
+        catch (e) {
+            console.error('[AudioCache] チャンク同期例外:', e);
+        }
+    }
+    static async getAudioElement(filename) {
+        const url = `audio/${filename}`;
+        try {
+            if ('caches' in window) {
+                const cache = await caches.open(CACHE_NAME);
+                const response = await cache.match(url);
+                if (response) {
+                    const blob = await response.blob();
+                    const blobUrl = URL.createObjectURL(blob);
+                    const audio = new Audio(blobUrl);
+                    const cleanup = () => {
+                        URL.revokeObjectURL(blobUrl);
+                        audio.removeEventListener('ended', cleanup);
+                        audio.removeEventListener('error', cleanup);
+                    };
+                    audio.addEventListener('ended', cleanup);
+                    audio.addEventListener('error', cleanup);
+                    return audio;
+                }
+            }
+        }
+        catch (e) { }
+        return new Audio(url);
+    }
+}
